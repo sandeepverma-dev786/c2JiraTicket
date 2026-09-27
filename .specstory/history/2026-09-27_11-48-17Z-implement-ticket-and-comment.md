@@ -2971,62 +2971,380 @@ After implementation:
 
 _**Agent (copilot/auto)**_
 
+<think><details><summary>Thought Process</summary>
+The contract confirms create/update requests must omit server-controlled fields, detail responses alone include comments, and malformed enum input should return a validation error. My working hypothesis is the existing validation starter and `TicketStatus` enum are enough for typed DTOs; I’m checking the package stubs and dependencies before adding the boundary types and advice.
+
+The validation starter is present and `TicketStatus` is already a Java enum, so typed request records provide enum-safe binding and Jakarta constraints without new dependencies. I’m adding four request DTOs, two response DTOs (comments omitted except on detail responses), and the shared error response/advice with typed 404/409 exceptions and generic 500 handling.
+
+The check exposed a real boundary gap: Boot’s mapper silently ignored `status` in an update payload, so that forbidden field was not rejected. I’m tightening only the request records with Jackson unknown-property guards; this keeps the DTO schema closed without changing global mapper configuration, then I’ll rerun the same targeted checks.
+</details></think>
+
+_**Agent (copilot/auto)**_
+
 I’ll reread the requested API/spec/rule documents, then inspect existing DTO and exception package stubs and enum types. I’ll keep the work to boundary models plus centralized error translation, with no controller, service, or repository behavior.
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `implementation-plan.md`
+
+**Input:**
+
+- endLine: `360`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/plan/implementation-plan.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Implementation Plan
+
+This plan follows the finalized specifications and repository rules. Implement only the required behavior; do not add authentication, Kafka, Redis, notifications, dashboards, pagination, Docker, microservices, cloud infrastructure, or other out-of-scope features. In particular, the backend state machine is authoritative: frontend transition controls are guidance and must not replace backend enforcement.
+
+Paths such as `<backend-root>` and `<frontend-root>` are placeholders for the chosen project layout. Create only files needed for the listed responsibilities.
+
+## Sequential Tasks
+
+### Task 01: Project and Backend Foundation
+
+- **Purpose:** Confirm the approved specifications as the implementation baseline; establish the minimal Java 21/Spring Boot backend application and build configuration.
+- **Files/packages likely to be created or changed:** `<backend-root>/` build and application configuration files; application bootstrap under the chosen root package.
+- **Dependencies/prerequisites:** All specification and guidance documents approved; none of the application layers exists yet.
+- **Validation/test expected:** Backend builds and starts with its test profile; verify Java 21 and Spring Boot configuration. No business behavior is added here.
+
+### Task 02: Domain Enums and Entities
+
+- **Purpose:** Define the ticket and comment domain/persistence shapes and approved value sets.
+- **Files/packages likely to be created or changed:** `<application-root>/entity/Ticket`, `Comment`; `<application-root>/entity/TicketStatus`, `Priority` (or equivalent domain package).
+- **Dependencies/prerequisites:** Task 01.
+- **Validation/test expected:** Compile and add focused model checks if the chosen persistence mapping requires them; confirm all enum values and fields match `spec/data-model.md`.
+
+### Task 03: Repository and Persistence
+
+- **Purpose:** Persist and retrieve tickets and comments using file-based H2 for local devel
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `requirements.md`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/requirements.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Requirements
+
+## Scope
+
+The system provides a user interface and REST API for creating, finding, viewing, and maintaining support tickets. Ticket data must be stored in a database and remain available after an application restart. The system must enforce the specified ticket status workflow on the backend.
+
+Technology constraints are Java 21, Spring Boot, PostgreSQL or H2, a REST API, and React/Next.js or an equivalent frontend. Use file-based H2 for local development so persisted data survives an application restart. Other environments may use PostgreSQL or H2. Except for the status-transition route defined below, these constraints do not prescribe endpoint shapes or screen layout.
+
+## Functional Requirements
+
+1. A user can create a ticket from the UI.
+2. A user can list tickets.
+3. A user can view the details of a ticket.
+4. A user can update a ticket's title, description, priority, and assignee. Assignee is an optional String field.
+5. A user can add comments to a ticket. Each comment contains `id`, `ticketId`, `author`, `content`, and `createdAt`. The server generates the comment `id` as a UUID and generates `createdAt`; the client supplies `author` as a String.
+6. A user can search tickets by keyword in the title and description using case-insensitive substring matching. A blank or whitespace-only keyword applies no search filter. Search can be combined with status filtering.
+7. A user can filter tickets by status.
+8. The system persists ticket data in a database so that it survives application restart.
+9. The backend validates input according to the validation requirements below.
+10. A client requests a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target `status`. The backend accepts only valid transitions and rejects invalid transitions, as defined in [state-machine.md](state-machine.md).
+11. The UI displays meaningful errors when an operation fails.
+
+## Non-Functional Requirements
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `data-model.md`
+
+**Input:**
+
+- endLine: `260`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/data-model.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Data Model
+
+This document defines the logical persistence/domain model using only decisions established in [requirements.md](requirements.md), [state-machine.md](state-machine.md), and [architecture.md](architecture.md). It does not define Java classes or implementation code.
+
+## Types
+
+| Type | Values |
+| --- | --- |
+| `TicketStatus` | `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELLED` |
+| `Priority` | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` |
+
+The valid status transitions and initial status are defined in [state-machine.md](state-machine.md). New tickets start in `OPEN`.
+
+## Ticket
+
+| Field | Logical type | Required? | Constraints and ownership |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | Generated by the server. Clients do not provide it. |
+| `title` | String | Yes | 1-200 characters. |
+| `description` | String | Yes | 1-2000 characters. |
+| `priority` | `Priority` | Yes | One of the defined `Priority` values. |
+| `status` | `TicketStatus` | Yes | Server-controlled; new tickets start in `OPEN`, and changes must follow the approved state machine. |
+| `assignee` | String | No | Optional; not a reference to a User entity. |
+| `createdAt` | Timestamp | Yes | Generated by the server when the ticket is created. Clients do not provide it. |
+| `updatedAt` | Timestamp | Yes | Generated and maintained by the server. Clients do not provide it. |
+
+## Comment
+
+| Field | Logical type | Required? | Constraints and ownership |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | Generated by the server. Clients do not provide it. |
+| `ticketId` | UUID / Ticket relationship | Yes | References exactly one existing Ticket. |
+| `author` | String | Yes | Supplied by the client. No further validation constraint is specified. |
+| `content` | String | Yes | 1-1000 characters. |
+| `createdAt` | Timestamp | Yes | Generated by the server when the comment is created. Clients do not provide it. |
+
+## Relationship
+
+- One Ticket has many Comments.
+- Each Co
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `api-contract.md`
+
+**Input:**
+
+- endLine: `340`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/api-contract.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System API Contract
+
+This document defines the JSON REST contract for the required ticket and comment operations. Ticket and comment fields follow [data-model.md](data-model.md); ticket statuses and allowed transitions follow [state-machine.md](state-machine.md). Persistence entities are not exposed directly; the JSON resources below are API representations.
+
+Ticket IDs and comment IDs are server-generated UUIDs. The server generates `createdAt` and `updatedAt`; clients must not provide or modify IDs or timestamps. Timestamp values are read-only ISO-8601 strings in UTC, for example `2026-09-27T10:30:00Z`. In the examples below, `<server-generated timestamp>` stands in for a value in this format. New tickets start with status `OPEN`. No authentication, deletion, or pagination endpoints are included.
+
+## Common Error Response
+
+Errors use the consistent JSON structure defined in [requirements.md](requirements.md). Validation errors also contain field-level `errors`.
+
+Validation error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "Request validation failed",
+  "errors": {
+    "title": "Title is required"
+  },
+  "path": "/api/tickets"
+}
+```
+
+Not-found error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 404,
+  "code": "NOT_FOUND",
+  "message": "Ticket not found",
+  "path": "/api/tickets/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## Create Ticket
+
+- **Method:** `POST`
+- **Path:** `/api/tickets`
+- **Query parameters:** None
+- **Request JSON:** `title`, `description`, and `priority` are required. `assignee` is optional. Do not send `id`, `status`, `createdAt`, or `updatedAt`; the server generates the ID and timestamps and assigns `OPEN` status.
+
+```json
+{
+  "title": "Cannot access account",
+  "description": "The sign-in page returns an error.",
+  "priority": "HIGH",
+  "assignee": "Support Team"
+}
+```
+
+- **Success:** `201 CREATED`
+- *
+… (output truncated)
+````
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `architecture.md`
+
+**Input:**
+
+- endLine: `260`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/architecture.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System Architecture
+
+## High-Level Architecture
+
+The application is a single frontend backed by a single Spring Boot REST service and a relational database:
+
+```text
+React/Vite frontend  <---- JSON over HTTP ---->  Spring Boot REST backend  <---->  File-based H2
+```
+
+- **Frontend:** React with Vite. Provides ticket creation, listing, details, updates, comments, keyword search, status filtering, status changes, and user-visible error messages.
+- **Backend:** Java 21 and Spring Boot. Exposes the REST API, validates incoming data, applies ticket business rules, enforces the state machine, and translates expected failures to the standard JSON error format.
+- **Persistence:** File-based H2 for local development. Ticket and comment data must remain available after an application restart.
+
+Keep this as a simple layered application. The frontend communicates with the backend through HTTP and does not access the database directly.
+
+## Backend Package Structure
+
+Use packages within the application's existing root package. A suitable minimal structure is:
+
+```text
+<application-root>/
+  controller/   HTTP endpoints and request/response binding
+  service/      use cases, business rules, and state-transition validation
+  repository/   persistence access
+  entity/       persisted ticket and comment models
+  dto/          API request and response models
+  exception/    application errors and centralized HTTP error translation
+  config/       only required application configuration
+  mapper/       only if explicit mapping logic warrants a separate package
+```
+
+Controllers should handle HTTP concerns and delegate use cases to services. Services own business decisions and coordinate repositories. Repositories perform persistence operations. DTOs define API boundaries; persistence entities are not exposed directly as API responses. Use constructor injection between layers.
+
+Keep `config` and `mapper` only when there is actual configuration or mapping to main
+… (output truncated)
+````
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `java-springboot.md`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/java-springboot.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Java 21 and Spring Boot Guidelines
+
+Use Java 21 language and standard-library features where they improve clarity. Follow the Java and Spring Boot versions, dependencies, and conventions established by the repository; do not upgrade or introduce dependencies without a requirement.
+
+## Architecture
+
+- Keep responsibilities separated: controllers handle HTTP concerns, services coordinate use cases, and repositories handle persistence. Keep business rules in an appropriate domain or service layer rather than in controllers or persistence code.
+- Make dependencies explicit with constructor injection. Avoid field injection and service-locator patterns.
+- Keep boundaries small and cohesive. Add an abstraction only when it expresses a real domain concept, isolates a meaningful dependency, or removes substantial duplication.
+
+## Data and Validation
+
+- Use request and response DTOs at API boundaries. Do not expose persistence entities as API contracts.
+- Validate untrusted input at the boundary with Jakarta Bean Validation where appropriate, and enforce important invariants in the business layer as well.
+- Use explicit mapping between API models and domain or persistence models. Keep mapping straightforward and avoid generic mapping frameworks unless the project already uses one for good reason.
+
+## Errors and Maintainability
+
+- Translate expected domain and persistence failures into deliberate application errors. Handle HTTP translation centrally rather than duplicating it in controllers.
+- Prefer clear names, focused methods, immutable values where practical, and straightforward control flow. Avoid speculative features, redundant wrappers, and abstractions that obscure behavior.
+- Keep configuration externalized. Avoid hidden mutable global state and catch exceptions only when the code can handle or meaningfully translate them.
+
+## Security
+
+- Apply authentication and authorization according to the approved requirements; enforce access checks on every relevant operation,
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `api-standards.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/api-standards.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# API Standards
+
+Treat approved specifications as the source of truth for API behavior. Record contract decisions there before implementation when a convention is not yet specified.
+
+## REST and Naming
+
+- Model endpoints as resource-oriented paths, using consistent plural nouns for collections and stable identifiers for individual resources. Avoid verbs in paths unless an explicitly modeled action cannot be represented clearly as a resource operation.
+- Use consistent casing and nesting. Keep nesting shallow and do not expose database table names or internal implementation details.
+- Use JSON consistently for request and response bodies unless the contract requires another media type. Represent dates and times in a documented, unambiguous format.
+
+## HTTP Methods and Status Codes
+
+- Use `GET` to read, `POST` to create or invoke a documented non-idempotent operation, `PUT` to replace, `PATCH` to partially update, and `DELETE` to remove a resource.
+- Preserve HTTP method safety and idempotency semantics. Document concurrency behavior and repeat-request behavior where relevant.
+- Use status codes consistently: `200` for a successful response with a body, `201` for resource creation, `204` for success without a body, `400` for malformed or invalid requests, `401` for missing or invalid authentication, `403` for insufficient permission, `404` for unavailable resources, and `409` for conflicts with current state. Use other codes only when the contract defines their meaning.
+
+## Validation and Errors
+
+- Validate request shape and values at the API boundary, and return client errors in the documented format. Do not rely on clients to enforce server-side rules.
+- Use one consistent error-response structure across endpoints. Include a stable machine-readable error identifier and safe message; include field-level details when useful and specified. Do not expose stack traces, SQL, internal class names, secrets, or sensitive data.
+- Map expected validation, authorization, not-fo
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
@@ -3035,50 +3353,181 @@ The contract confirms create/update requests must omit server-controlled fields,
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_listDirectory"><details>
-<summary>Tool use: **copilot_listDirectory**</summary>
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
 
 Read `dto`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto`
+
+**Result:**
+
+```
+package-info.java
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_listDirectory"><details>
-<summary>Tool use: **copilot_listDirectory**</summary>
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
 
 Read `exception`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception`
+
+**Result:**
+
+```
+package-info.java
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `TicketStatus.java`
+
+**Input:**
+
+- endLine: `80`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/entity/TicketStatus.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.entity;
+
+public enum TicketStatus {
+	OPEN,
+	IN_PROGRESS,
+	RESOLVED,
+	CLOSED,
+	CANCELLED
+}
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `package-info.java`
+
+**Input:**
+
+- endLine: `80`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/package-info.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `package-info.java`
+
+**Input:**
+
+- endLine: `80`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/package-info.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.exception;
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `pom.xml`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/pom.xml`
+- startLine: `1`
+
+**Result:**
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.5.6</version>
+		<relativePath />
+	</parent>
+
+	<groupId>com.supportticket</groupId>
+	<artifactId>support-ticket-management</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>support-ticket-management</name>
+	<description>Support Ticket Management System backend</description>
+
+	<properties>
+		<java.version>21</java.version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+</project>
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
@@ -3495,6 +3944,19 @@ _**Agent (copilot/auto)**_
 <summary>Tool use: **run_in_terminal**</summary>
 
 Running ` mvn test`
+
+Run the project's configured test/build lifecycle after adding DTO and error handling code.
+
+```bash
+mvn test
+```
+
+**Result:**
+
+```
+Command 'mvn' not found, but can be installed with:
+sudo apt install maven
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
@@ -3507,14 +3969,46 @@ _**Agent (copilot/auto)**_
 <summary>Tool use: **run_in_terminal**</summary>
 
 Running ` mkdir -p /tmp/c2jir-ticket-step11-classes && dependency\_classpath=$\(find "$H...`
+
+Compile all Java backend sources against locally cached dependencies as an alternative to Maven.
+
+```bash
+mkdir -p /tmp/c2jir-ticket-step11-classes && dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step11-classes $(find src/main/java -name '*.java')
+```
+
+**Result:**
+
+```
+
+
+Command produced no output
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_getErrors"><details>
-<summary>Tool use: **copilot_getErrors**</summary>
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
 
 Checked , no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception"
+]
+```
+
+
+**Result:**
+
+```
+No errors found.
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
@@ -3527,14 +4021,134 @@ _**Agent (copilot/auto)**_
 <summary>Tool use: **run_in_terminal**</summary>
 
 Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Exercise Jakarta DTO validation, Boot's configured Jackson handling of forbidden request fields, and shallow/detail ticket response JSON using isolated in-memory H2.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.time.Instant;
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import jakarta.validation.Validation;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(WebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-check;DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var validator = Validation.buildDefaultValidatorFactory().getValidator();
+var violations = validator.validate(new CreateTicketRequest("", "", null, null));
+if (!violations.stream().map(v -> v.getPropertyPath().toString()).collect(java.util.stream.Collectors.toSet()).containsAll(Set.of("title", "description", "priority"))) throw new AssertionError("ticket validation constraints missing");
+var updateWithStatus = mapper.readValue("{\"title\":\"A\",\"description\":\"B\",\"priority\":\"LOW\",\"status\":\"CLOSED\"}", UpdateTicketRequest.class);
+System.out.println("Update request after forbidden status field: " + updateWithStatus);
+var shallow = mapper.writeValueAsString(new TicketResponse(UUID.randomUUID(), "A", "B", Priority.LOW, TicketStatus.OPEN, null, Instant.now(), Instant.now(), null));
+if (shallow.contains("comments")) throw new AssertionError("comments should be omitted outside detail response");
+var detail = mapper.writeValueAsString(new TicketResponse(UUID.randomUUID(), "A", "B", Priority.LOW, TicketStatus.OPEN, null, Instant.now(), Instant.now(), List.of()));
+if (!detail.contains("\"comments\":[]")) throw new AssertionError("detail response should include comments");
+System.out.println("DTO validation and ticket response serialization checks passed");
+context.close();
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import java.time.Instant;
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import jakarta.validation.Validation;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-check;DB
+_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var validator = Validation.buildDefaultValidatorFactory().getValidator();
+var violations = validator.validate(new CreateTicketRequest("", "", null, null))
+;
+if (!violations.stream().map(v -> v.getPropertyPath().toString()).collect(java.u
+til.stream.Collectors.toSet()).containsAll(Set.of("title", "description", "prior
+ity"))) throw new AssertionError("ticket validation constraints missing");
+var updateWithStatus = mapper.readValue("{\"title\":\"A\",\"description\":\"B\",
+\"priority\":\"LOW\",\"status\":\"CLOSED\"}", UpdateTicketRequest.class);
+System.out.println("Update request after forbidden status field: " + updateWithS
+tatus);
+var shallow = mapper.writeValueAsString(new TicketResponse(UUID.randomUUID(), "A
+", "B", Priority.LOW, TicketStatus.OPEN, null, Instant.now(), Instant.now(), nul
+l));
+if (shallow.contains("comments")) throw new AssertionError("comments should be o
+EOFitxt.close();ln("DTO validation and ticket response serialization checks pass
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+js
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `content.txt`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_fvZqHMDPjjCd6xyQl8UxyBWZ__vscode-1790509702544/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import java.time.Instant;
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import jakarta.validation.Validation;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-check;DB
+_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var validator = Validation.buildDefaultValidatorFactory().getValidator();
+var violations = validator.validate(new CreateTicketRequest("", "", null, null))
+;
+if (!violations.stream().map(v -> v.getPropertyPath().toString()).collect(java.u
+til.stream.Collectors.toSet()).containsAll(Set.of("title", "description", "prior
+ity"))) throw new AssertionError("ticket validation constraints missing");
+var updateWithStatus = mapper.readValue("{\"title\":\"A\",\"description\":\"B\",
+\"priority\":\"LOW\",\"status\":\"CLOSED\"}", UpdateTicketRequest.class);
+System.out.println("Update request after forbidden status field: " + updateWithS
+tatus);
+var shallow = mapper.writeValueAsString(new TicketResponse(UUID.randomUUID(), "A
+", "B", Priority.LOW, TicketStatus.OPEN, null, Instant.now(), Instant.now(), nul
+l));
+if (shallow.contains("comments")) throw new AssertionError("comments should be o
+EOFitxt.close();ln("DTO validation and ticket response serialization checks pass
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+js
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
@@ -3703,6 +4317,21 @@ _**Agent (copilot/auto)**_
 <summary>Tool use: **run_in_terminal**</summary>
 
 Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Recompile the DTO guard changes against the cached project dependencies.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step11-classes $(find src/main/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step11-classes $(find src/main/java -name '*.java')
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
@@ -3711,14 +4340,139 @@ _**Agent (copilot/auto)**_
 <summary>Tool use: **run_in_terminal**</summary>
 
 Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Verify closed request schemas, enum rejection, validation, detail-only comments, and structured 404/409 responses in a Spring context using in-memory H2.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.time.Instant;
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.mock.web.MockHttpServletRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.*;
+import jakarta.validation.Validation;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(WebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-check;DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var validator = Validation.buildDefaultValidatorFactory().getValidator();
+var violations = validator.validate(new CreateTicketRequest("", "", null, null));
+if (!violations.stream().map(v -> v.getPropertyPath().toString()).collect(java.util.stream.Collectors.toSet()).containsAll(Set.of("title", "description", "priority"))) throw new AssertionError("ticket validation constraints missing");
+for (var requestJson : List.of("{\"title\":\"A\",\"description\":\"B\",\"priority\":\"LOW\",\"status\":\"CLOSED\"}", "{\"author\":\"A\",\"content\":\"B\",\"ticketId\":\"00000000-0000-0000-0000-000000000001\"}")) { var rejected = false; try { if (requestJson.contains("ticketId")) mapper.readValue(requestJson, CreateCommentRequest.class); else mapper.readValue(requestJson, UpdateTicketRequest.class); } catch (JsonProcessingException exception) { rejected = true; } if (!rejected) throw new AssertionError("server-owned field was accepted"); }
+var invalidStatusRejected = false;
+try { mapper.readValue("{\"status\":\"NOT_A_STATUS\"}", ChangeTicketStatusRequest.class); } catch (JsonProcessingException exception) { invalidStatusRejected = true; }
+if (!invalidStatusRejected) throw new AssertionError("invalid enum status was accepted");
+var shallow = mapper.writeValueAsString(new TicketResponse(UUID.randomUUID(), "A", "B", Priority.LOW, TicketStatus.OPEN, null, Instant.now(), Instant.now(), null));
+if (shallow.contains("comments")) throw new AssertionError("comments should be omitted outside detail response");
+var detail = mapper.writeValueAsString(new TicketResponse(UUID.randomUUID(), "A", "B", Priority.LOW, TicketStatus.OPEN, null, Instant.now(), Instant.now(), List.of()));
+if (!detail.contains("\"comments\":[]")) throw new AssertionError("detail response should include comments");
+var handler = context.getBean(ApiExceptionHandler.class);
+var request = new MockHttpServletRequest(); request.setRequestURI("/api/tickets/missing");
+var notFound = handler.handleTicketNotFound(new TicketNotFoundException(), request).getBody();
+if (notFound.status() != 404 || !notFound.code().equals("NOT_FOUND") || !notFound.path().equals("/api/tickets/missing")) throw new AssertionError("not-found response contract failed");
+var conflict = handler.handleInvalidStatusTransition(new InvalidStatusTransitionException(), request).getBody();
+if (conflict.status() != 409 || !conflict.code().equals("INVALID_STATUS_TRANSITION")) throw new AssertionError("conflict response contract failed");
+System.out.println("DTO validation, strict JSON binding, response serialization, and 404/409 error checks passed");
+context.close();
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import java.time.Instant;
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.mock.web.MockHttpServletRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.*;
+import jakarta.validation.Validation;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-check;DB
+_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var validator = Validation.buildDefaultValidatorFactory().getValidator();
+var violations = validator.validate(new CreateTicketRequest("", "", null, null))
+;
+if (!violations.stream().map(v -> v.getPropertyPath().toString()).collect(java.u
+til.stream.Collectors.toSet()).containsAll(Set.of("title", "description", "prior
+ity"))) throw new AssertionError("ticket validation constraints missing");
+for (var requestJson : List.of("{\"title\":\"A\",\"description\":\"B\",\"priorit
+y\":\"LOW\",\"status\":\"CLOSED\"}", "{\"author\":\"A\",\"content\":\"B\",\"tick
+etId\":\"00000000-0000-0000-0000-000000000001\"}")) { var rejected = false; try
+{ if (requestJson.contains("ticketId")) mapper.readValue(requestJson, CreateComm
+entRequest.class); else mapper.readValue(requestJson, UpdateTicketRequest.class)
+; } catch (JsonProcessingException exception) { rejected = true; } if (!rejected
+EOFitxt.close(
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `content.txt`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_n0N4Rp6GzNVoKZPLwS8gtprJ__vscode-1790509702548/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import java.time.Instant;
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.mock.web.MockHttpServletRequest;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.*;
+import jakarta.validation.Validation;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-check;DB
+_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var validator = Validation.buildDefaultValidatorFactory().getValidator();
+var violations = validator.validate(new CreateTicketRequest("", "", null, null))
+;
+if (!violations.stream().map(v -> v.getPropertyPath().toString()).collect(java.u
+til.stream.Collectors.toSet()).containsAll(Set.of("title", "description", "prior
+ity"))) throw new AssertionError("ticket validation constraints missing");
+for (var requestJson : List.of("{\"title\":\"A\",\"description\":\"B\",\"priorit
+y\":\"LOW\",\"status\":\"CLOSED\"}", "{\"author\":\"A\",\"content\":\"B\",\"tick
+etId\":\"00000000-0000-0000-0000-000000000001\"}")) { var rejected = false; try
+{ if (requestJson.contains("ticketId")) mapper.readValue(requestJson, CreateComm
+entRequest.class); else mapper.readValue(requestJson, UpdateTicketRequest.class)
+; } catch (JsonProcessingException exception) { rejected = true; } if (!rejected
+EOFitxt.close(
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
@@ -3858,6 +4612,21 @@ _**Agent (copilot/auto)**_
 <summary>Tool use: **run_in_terminal**</summary>
 
 Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Compile the updated API exception handler and all backend source files.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step11-classes $(find src/main/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step11-classes $(find src/main/java -name '*.java')
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
@@ -3866,12 +4635,15141 @@ _**Agent (copilot/auto)**_
 <summary>Tool use: **run_in_terminal**</summary>
 
 Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Exercise the centralized 400 validation and enum/type-mismatch mappings and ensure unexpected errors return a generic safe message.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.*;
+import jakarta.validation.*;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(WebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-errors;DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var handler = context.getBean(ApiExceptionHandler.class);
+var request = new MockHttpServletRequest(); request.setRequestURI("/api/tickets");
+var binding = new BeanPropertyBindingResult(new Object(), "request"); binding.addError(new FieldError("request", "title", "Title is required"));
+var validationResponse = handler.handleValidation(new BindException(binding), request).getBody();
+if (validationResponse.status() != 400 || !validationResponse.code().equals("VALIDATION_ERROR") || !validationResponse.errors().containsKey("title")) throw new AssertionError("field validation error response failed");
+JsonProcessingException parseFailure = null;
+try { mapper.readValue("{\"status\":\"NOT_A_STATUS\"}", ChangeTicketStatusRequest.class); } catch (JsonProcessingException exception) { parseFailure = exception; }
+var unreadable = new HttpMessageNotReadableException("invalid", parseFailure, new MockHttpInputMessage(new byte[0]));
+var enumResponse = handler.handleUnreadableRequest(unreadable, request).getBody();
+if (enumResponse.status() != 400 || !enumResponse.errors().containsKey("status")) throw new AssertionError("invalid enum field error response failed: " + enumResponse.errors());
+var mismatch = new MethodArgumentTypeMismatchException("NOPE", TicketStatus.class, "status", null, null);
+if (handler.handleTypeMismatch(mismatch, request).getBody().status() != 400) throw new AssertionError("query status conversion error failed");
+var unexpected = handler.handleUnexpected(new IllegalStateException("private stack detail"), request).getBody();
+if (unexpected.status() != 500 || unexpected.message().contains("private stack detail")) throw new AssertionError("unexpected error leaked details");
+System.out.println("400 validation/type errors and generic 500 redaction checks passed");
+context.close();
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
+tion;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.*;
+import jakarta.validation.*;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-errors;D
+B_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var handler = context.getBean(ApiExceptionHandler.class);
+var request = new MockHttpServletRequest(); request.setRequestURI("/api/tickets"
+);
+var binding = new BeanPropertyBindingResult(new Object(), "request"); binding.ad
+EOFitxt.close();ln("400 validation/type errors and generic 500 redaction checks 
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+
+… (output truncated)
+```
 </details></tool-use>
 
 _**Agent (copilot/auto)**_
 
-<tool-use data-tool-type="generic" data-tool-name="copilot_readFile"><details>
-<summary>Tool use: **copilot_readFile**</summary>
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
 
 Read `content.txt`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_wmtUDljNlhoGBn0wezYezGaU__vscode-1790509702552/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step11-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import java.util.*;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
+tion;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.*;
+import jakarta.validation.*;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step11-errors;D
+B_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var mapper = context.getBean(ObjectMapper.class);
+var handler = context.getBean(ApiExceptionHandler.class);
+var request = new MockHttpServletRequest(); request.setRequestURI("/api/tickets"
+);
+var binding = new BeanPropertyBindingResult(new Object(), "request"); binding.ad
+EOFitxt.close();ln("400 validation/type errors and generic 500 redaction checks 
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+
+… (output truncated)
+```
 </details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The targeted checks now pass, including a 400 field-error response, invalid enum/query conversion handling, 404 and 409 codes, detail-only comment serialization, and generic 500 redaction. I’m doing the final workspace/diagnostic check now; Maven remains the only unavailable verification path.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short`
+
+Confirm no specification files or unrelated paths were modified during DTO and error-handler implementation.
+
+```bash
+git status --short
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_10-01-02Z-spec-driven-development-guidelines.md
+?? .gitignore
+?? .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+?? .vscode/
+?? pom.xml
+?? src/
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked , no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception"
+]
+```
+
+
+**Result:**
+
+```
+No errors found.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Created only these 10 files:
+
+- `src/main/java/com/supportticket/dto/CreateTicketRequest.java`
+- `src/main/java/com/supportticket/dto/UpdateTicketRequest.java`
+- `src/main/java/com/supportticket/dto/ChangeTicketStatusRequest.java`
+- `src/main/java/com/supportticket/dto/CreateCommentRequest.java`
+- `src/main/java/com/supportticket/dto/TicketResponse.java`
+- `src/main/java/com/supportticket/dto/CommentResponse.java`
+- `src/main/java/com/supportticket/dto/ApiErrorResponse.java`
+- `src/main/java/com/supportticket/exception/ApiExceptionHandler.java`
+- `src/main/java/com/supportticket/exception/TicketNotFoundException.java`
+- `src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java`
+
+Requests use enum-typed fields and Jakarta validation. Unknown JSON fields are rejected so server-owned fields cannot be silently accepted. Error handling covers validation and type errors, 404, 409, and generic 500 responses without exposing internal details. No specifications or unrelated files were changed.
+
+**Verification:** `mvn test` could not run because Maven and a wrapper are unavailable. Java 21 compilation, Spring context startup, and isolated smoke checks for DTO validation, JSON binding/serialization, and error responses passed. No additional assumptions beyond omitting  when a response is not a detail response.
+
+---
+
+_**User (2026-09-27 12:08:58Z)**_
+
+We are implementing STEP 12 from plan/implementation-plan.md.
+
+Before making changes, read:
+- spec/requirements.md
+- spec/state-machine.md
+- spec/data-model.md
+- spec/api-contract.md
+- spec/architecture.md
+- plan/implementation-plan.md
+- rules/java-springboot.md
+- rules/testing.md
+
+Implement ONLY the Ticket service/business layer.
+
+### Ticket operations
+
+Implement service methods for:
+
+1. Create ticket
+   - Validate through the approved DTO validation
+   - Set status to OPEN
+   - Generate ID and timestamps on the server
+   - Persist through TicketRepository
+
+2. Get ticket by ID
+   - Return the appropriate response DTO
+   - Throw the application's not-found exception when absent
+
+3. List/search/filter tickets
+   - Support optional keyword
+   - Support optional status
+   - Support keyword + status together
+   - Blank/whitespace keyword means no keyword filter
+
+4. Update ticket
+   - Update only title, description, priority and assignee
+   - Do NOT allow status changes through this operation
+   - Do NOT allow ID or createdAt modification
+   - Update updatedAt on a successful update
+   - Throw NOT_FOUND when the ticket does not exist
+
+5. Change ticket status
+   - Accept the target TicketStatus
+   - Read the current persisted status
+   - Enforce exactly the state machine from spec/state-machine.md
+
+Valid transitions:
+
+OPEN -> IN_PROGRESS
+OPEN -> CANCELLED
+IN_PROGRESS -> RESOLVED
+IN_PROGRESS -> CANCELLED
+RESOLVED -> CLOSED
+
+All other transitions are invalid, including:
+- CLOSED -> anything
+- CANCELLED -> anything
+- RESOLVED -> OPEN
+- CLOSED -> OPEN
+- CANCELLED -> OPEN
+- same-state transitions
+
+For an invalid transition:
+- throw the appropriate business exception
+- it must ultimately become HTTP 409 CONFLICT
+- error code must be INVALID_STATUS_TRANSITION
+- do NOT modify or save the ticket
+- include a meaningful message describing the current and requested status
+
+The backend must be authoritative. Do not rely on frontend transition restrictions.
+
+### State-machine implementation
+
+Use a clear and explicit representation of allowed transitions, such as a map/set or equivalent.
+
+Do NOT simply do:
+
+ticket.setStatus(request.getStatus());
+
+without validating the transition first.
+
+Do not create a generic workflow engine or introduce unnecessary abstractions.
+
+### Mapping
+
+Map between persistence entities and API DTOs.
+
+Do not expose JPA entities directly.
+
+### Scope
+
+Do NOT implement:
+- controllers
+- frontend
+- comments
+- authentication
+- Kafka
+- Redis
+- notifications
+- unrelated business logic
+
+Comments will be implemented in a later task.
+
+After implementation:
+1. Run the existing build/tests.
+2. Report files created/changed.
+3. Explain how the state machine is enforced.
+4. Report any assumptions or AI-generated issues discovered.
+5. Do not modify specification files.
+
+---
+
+_**Agent (copilot/auto)**_
+
+<think><details><summary>Thought Process</summary>
+The nearby repository already exposes all five list/filter combinations via `findByFilters`, and the service stub has no current implementation or test tree. I’m verifying Ticket’s mutation/generated-field API and exception usages; the implementation will delegate filtering to the repository, validate the same request DTO constraints, and use a closed explicit transition map so rejects happen before mutation or save.
+
+The real H2 check caught an important defect: UUID generation happened on `save`, but `createdAt`/`updatedAt` were still null when the response DTO was mapped before flush. I’m changing mutating service operations to `saveAndFlush` so Hibernate-generated values are available in returned responses, and updating the unit-test stubs/verifications to match.
+
+The `saveAndFlush` fix now returns populated UUID/creation/update timestamps on create, and real H2 checks confirm editable updates persist while status remains `OPEN`; a rejected transition leaves the persisted status unchanged. I’m rerunning the compiled unit-test methods against the updated repository calls, then I’ll report the Maven limitation and exact files.
+</details></think>
+
+_**Agent (copilot/auto)**_
+
+I’ll reread the eight requested spec and rule files first, then inspect the current service/repository/DTO/exception APIs so the business layer fits the implemented model. I’ll keep changes in the service package and add focused tests only if an existing test setup supports them.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `implementation-plan.md`
+
+**Input:**
+
+- endLine: `360`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/plan/implementation-plan.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Implementation Plan
+
+This plan follows the finalized specifications and repository rules. Implement only the required behavior; do not add authentication, Kafka, Redis, notifications, dashboards, pagination, Docker, microservices, cloud infrastructure, or other out-of-scope features. In particular, the backend state machine is authoritative: frontend transition controls are guidance and must not replace backend enforcement.
+
+Paths such as `<backend-root>` and `<frontend-root>` are placeholders for the chosen project layout. Create only files needed for the listed responsibilities.
+
+## Sequential Tasks
+
+### Task 01: Project and Backend Foundation
+
+- **Purpose:** Confirm the approved specifications as the implementation baseline; establish the minimal Java 21/Spring Boot backend application and build configuration.
+- **Files/packages likely to be created or changed:** `<backend-root>/` build and application configuration files; application bootstrap under the chosen root package.
+- **Dependencies/prerequisites:** All specification and guidance documents approved; none of the application layers exists yet.
+- **Validation/test expected:** Backend builds and starts with its test profile; verify Java 21 and Spring Boot configuration. No business behavior is added here.
+
+### Task 02: Domain Enums and Entities
+
+- **Purpose:** Define the ticket and comment domain/persistence shapes and approved value sets.
+- **Files/packages likely to be created or changed:** `<application-root>/entity/Ticket`, `Comment`; `<application-root>/entity/TicketStatus`, `Priority` (or equivalent domain package).
+- **Dependencies/prerequisites:** Task 01.
+- **Validation/test expected:** Compile and add focused model checks if the chosen persistence mapping requires them; confirm all enum values and fields match `spec/data-model.md`.
+
+### Task 03: Repository and Persistence
+
+- **Purpose:** Persist and retrieve tickets and comments using file-based H2 for local devel
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `requirements.md`
+
+**Input:**
+
+- endLine: `290`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/requirements.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Requirements
+
+## Scope
+
+The system provides a user interface and REST API for creating, finding, viewing, and maintaining support tickets. Ticket data must be stored in a database and remain available after an application restart. The system must enforce the specified ticket status workflow on the backend.
+
+Technology constraints are Java 21, Spring Boot, PostgreSQL or H2, a REST API, and React/Next.js or an equivalent frontend. Use file-based H2 for local development so persisted data survives an application restart. Other environments may use PostgreSQL or H2. Except for the status-transition route defined below, these constraints do not prescribe endpoint shapes or screen layout.
+
+## Functional Requirements
+
+1. A user can create a ticket from the UI.
+2. A user can list tickets.
+3. A user can view the details of a ticket.
+4. A user can update a ticket's title, description, priority, and assignee. Assignee is an optional String field.
+5. A user can add comments to a ticket. Each comment contains `id`, `ticketId`, `author`, `content`, and `createdAt`. The server generates the comment `id` as a UUID and generates `createdAt`; the client supplies `author` as a String.
+6. A user can search tickets by keyword in the title and description using case-insensitive substring matching. A blank or whitespace-only keyword applies no search filter. Search can be combined with status filtering.
+7. A user can filter tickets by status.
+8. The system persists ticket data in a database so that it survives application restart.
+9. The backend validates input according to the validation requirements below.
+10. A client requests a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target `status`. The backend accepts only valid transitions and rejects invalid transitions, as defined in [state-machine.md](state-machine.md).
+11. The UI displays meaningful errors when an operation fails.
+
+## Non-Functional Requirements
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `state-machine.md`
+
+**Input:**
+
+- endLine: `250`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/state-machine.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Ticket State Machine
+
+This document defines the allowed ticket status transitions. The backend is authoritative and must reject transitions not listed as valid.
+
+New tickets always start in `OPEN`.
+
+## States
+
+- `OPEN`
+- `IN_PROGRESS`
+- `RESOLVED`
+- `CLOSED`
+- `CANCELLED`
+
+## Valid Transitions
+
+| Current state | Requested state | Result |
+| --- | --- | --- |
+| `OPEN` | `IN_PROGRESS` | Allowed |
+| `OPEN` | `CANCELLED` | Allowed |
+| `IN_PROGRESS` | `RESOLVED` | Allowed |
+| `IN_PROGRESS` | `CANCELLED` | Allowed |
+| `RESOLVED` | `CLOSED` | Allowed |
+
+## Invalid Transitions
+
+Any transition not listed in the valid-transition table is invalid, including same-state requests. `CLOSED` and `CANCELLED` are terminal states and have no outgoing transitions. Examples include:
+
+| Current state | Requested state | Result |
+| --- | --- | --- |
+| `CLOSED` | `OPEN` | Rejected |
+| `CLOSED` | `IN_PROGRESS` | Rejected |
+| `RESOLVED` | `OPEN` | Rejected |
+| `RESOLVED` | `CANCELLED` | Rejected |
+| `CANCELLED` | `OPEN` | Rejected |
+| `CANCELLED` | `IN_PROGRESS` | Rejected |
+| Any state | Same state | Rejected |
+
+## Transition Rules
+
+- A ticket may move only along a valid transition listed above.
+- Every new ticket starts in `OPEN`.
+- The backend must validate each requested transition; frontend restrictions do not replace backend validation.
+- Request a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target status, for example `{ "status": "IN_PROGRESS" }`.
+- A rejected transition must not change the ticket's current state.
+- Valid transitions have no additional business preconditions or required side effects.
+
+## Expected Backend Behavior for Invalid Transitions
+
+- Reject the requested transition and leave the ticket in its current state.
+- Return HTTP `409 CONFLICT`.
+- Return the error using the project's standard API error format.
+- Do not expose internal exception details.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `data-model.md`
+
+**Input:**
+
+- endLine: `270`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/data-model.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Data Model
+
+This document defines the logical persistence/domain model using only decisions established in [requirements.md](requirements.md), [state-machine.md](state-machine.md), and [architecture.md](architecture.md). It does not define Java classes or implementation code.
+
+## Types
+
+| Type | Values |
+| --- | --- |
+| `TicketStatus` | `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELLED` |
+| `Priority` | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` |
+
+The valid status transitions and initial status are defined in [state-machine.md](state-machine.md). New tickets start in `OPEN`.
+
+## Ticket
+
+| Field | Logical type | Required? | Constraints and ownership |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | Generated by the server. Clients do not provide it. |
+| `title` | String | Yes | 1-200 characters. |
+| `description` | String | Yes | 1-2000 characters. |
+| `priority` | `Priority` | Yes | One of the defined `Priority` values. |
+| `status` | `TicketStatus` | Yes | Server-controlled; new tickets start in `OPEN`, and changes must follow the approved state machine. |
+| `assignee` | String | No | Optional; not a reference to a User entity. |
+| `createdAt` | Timestamp | Yes | Generated by the server when the ticket is created. Clients do not provide it. |
+| `updatedAt` | Timestamp | Yes | Generated and maintained by the server. Clients do not provide it. |
+
+## Comment
+
+| Field | Logical type | Required? | Constraints and ownership |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | Generated by the server. Clients do not provide it. |
+| `ticketId` | UUID / Ticket relationship | Yes | References exactly one existing Ticket. |
+| `author` | String | Yes | Supplied by the client. No further validation constraint is specified. |
+| `content` | String | Yes | 1-1000 characters. |
+| `createdAt` | Timestamp | Yes | Generated by the server when the comment is created. Clients do not provide it. |
+
+## Relationship
+
+- One Ticket has many Comments.
+- Each Co
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `api-contract.md`
+
+**Input:**
+
+- endLine: `360`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/api-contract.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System API Contract
+
+This document defines the JSON REST contract for the required ticket and comment operations. Ticket and comment fields follow [data-model.md](data-model.md); ticket statuses and allowed transitions follow [state-machine.md](state-machine.md). Persistence entities are not exposed directly; the JSON resources below are API representations.
+
+Ticket IDs and comment IDs are server-generated UUIDs. The server generates `createdAt` and `updatedAt`; clients must not provide or modify IDs or timestamps. Timestamp values are read-only ISO-8601 strings in UTC, for example `2026-09-27T10:30:00Z`. In the examples below, `<server-generated timestamp>` stands in for a value in this format. New tickets start with status `OPEN`. No authentication, deletion, or pagination endpoints are included.
+
+## Common Error Response
+
+Errors use the consistent JSON structure defined in [requirements.md](requirements.md). Validation errors also contain field-level `errors`.
+
+Validation error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "Request validation failed",
+  "errors": {
+    "title": "Title is required"
+  },
+  "path": "/api/tickets"
+}
+```
+
+Not-found error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 404,
+  "code": "NOT_FOUND",
+  "message": "Ticket not found",
+  "path": "/api/tickets/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## Create Ticket
+
+- **Method:** `POST`
+- **Path:** `/api/tickets`
+- **Query parameters:** None
+- **Request JSON:** `title`, `description`, and `priority` are required. `assignee` is optional. Do not send `id`, `status`, `createdAt`, or `updatedAt`; the server generates the ID and timestamps and assigns `OPEN` status.
+
+```json
+{
+  "title": "Cannot access account",
+  "description": "The sign-in page returns an error.",
+  "priority": "HIGH",
+  "assignee": "Support Team"
+}
+```
+
+- **Success:** `201 CREATED`
+- *
+… (output truncated)
+````
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `architecture.md`
+
+**Input:**
+
+- endLine: `260`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/architecture.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System Architecture
+
+## High-Level Architecture
+
+The application is a single frontend backed by a single Spring Boot REST service and a relational database:
+
+```text
+React/Vite frontend  <---- JSON over HTTP ---->  Spring Boot REST backend  <---->  File-based H2
+```
+
+- **Frontend:** React with Vite. Provides ticket creation, listing, details, updates, comments, keyword search, status filtering, status changes, and user-visible error messages.
+- **Backend:** Java 21 and Spring Boot. Exposes the REST API, validates incoming data, applies ticket business rules, enforces the state machine, and translates expected failures to the standard JSON error format.
+- **Persistence:** File-based H2 for local development. Ticket and comment data must remain available after an application restart.
+
+Keep this as a simple layered application. The frontend communicates with the backend through HTTP and does not access the database directly.
+
+## Backend Package Structure
+
+Use packages within the application's existing root package. A suitable minimal structure is:
+
+```text
+<application-root>/
+  controller/   HTTP endpoints and request/response binding
+  service/      use cases, business rules, and state-transition validation
+  repository/   persistence access
+  entity/       persisted ticket and comment models
+  dto/          API request and response models
+  exception/    application errors and centralized HTTP error translation
+  config/       only required application configuration
+  mapper/       only if explicit mapping logic warrants a separate package
+```
+
+Controllers should handle HTTP concerns and delegate use cases to services. Services own business decisions and coordinate repositories. Repositories perform persistence operations. DTOs define API boundaries; persistence entities are not exposed directly as API responses. Use constructor injection between layers.
+
+Keep `config` and `mapper` only when there is actual configuration or mapping to main
+… (output truncated)
+````
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `java-springboot.md`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/java-springboot.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Java 21 and Spring Boot Guidelines
+
+Use Java 21 language and standard-library features where they improve clarity. Follow the Java and Spring Boot versions, dependencies, and conventions established by the repository; do not upgrade or introduce dependencies without a requirement.
+
+## Architecture
+
+- Keep responsibilities separated: controllers handle HTTP concerns, services coordinate use cases, and repositories handle persistence. Keep business rules in an appropriate domain or service layer rather than in controllers or persistence code.
+- Make dependencies explicit with constructor injection. Avoid field injection and service-locator patterns.
+- Keep boundaries small and cohesive. Add an abstraction only when it expresses a real domain concept, isolates a meaningful dependency, or removes substantial duplication.
+
+## Data and Validation
+
+- Use request and response DTOs at API boundaries. Do not expose persistence entities as API contracts.
+- Validate untrusted input at the boundary with Jakarta Bean Validation where appropriate, and enforce important invariants in the business layer as well.
+- Use explicit mapping between API models and domain or persistence models. Keep mapping straightforward and avoid generic mapping frameworks unless the project already uses one for good reason.
+
+## Errors and Maintainability
+
+- Translate expected domain and persistence failures into deliberate application errors. Handle HTTP translation centrally rather than duplicating it in controllers.
+- Prefer clear names, focused methods, immutable values where practical, and straightforward control flow. Avoid speculative features, redundant wrappers, and abstractions that obscure behavior.
+- Keep configuration externalized. Avoid hidden mutable global state and catch exceptions only when the code can handle or meaningfully translate them.
+
+## Security
+
+- Apply authentication and authorization according to the approved requirements; enforce access checks on every relevant operation,
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `testing.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/testing.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Testing Guidelines
+
+Derive expected behavior from approved specifications and existing project conventions. Do not invent business rules or state transitions to make a test pass.
+
+## Test Scope
+
+- Use unit tests for isolated business logic and decision-making. Replace external collaborators only where isolation is useful; do not mock the behavior under test.
+- Use integration tests for important framework, persistence, serialization, and component-boundary behavior. Keep them focused on observable contracts.
+- Test business rules through meaningful inputs and observable outcomes, including boundaries, invalid cases, and relevant combinations.
+- For stateful workflows, cover each specified state transition, rejected transition, and resulting state or side effect. Use only states and transitions defined by the approved specification.
+- Test request validation for required values, format and range constraints, and cross-field rules where specified. Confirm invalid requests produce the documented error response.
+
+## Test Quality
+
+- Name tests for the behavior and expected outcome, for example `rejectsTransitionWhenTicketIsClosed`.
+- Keep each test focused, readable, and independent. Assert outcomes and important side effects rather than implementation details.
+- Make tests deterministic: control time, randomness, generated identifiers, and external responses when they affect outcomes. Do not depend on execution order, real network services, arbitrary sleeps, or shared mutable fixtures.
+- Use representative fixtures and clean up test data. Avoid over-mocking, broad assertions, and tests that pass without proving a requirement.
+- Keep unit and integration test responsibilities distinct, and use the repository's existing test libraries and execution conventions.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The specs require the service to own state transitions and leave invalid tickets unsaved; the DTO and error types from the prior step provide the needed boundary contracts. I’m now checking their exact signatures and whether a test source tree exists so the service implementation and verification can stay aligned with the current repository.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short`
+
+Identify existing worktree changes before editing the service layer.
+
+```bash
+git status --short
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
+
+Read `service`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service`
+
+**Result:**
+
+```
+package-info.java
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="search" data-tool-name="file_search"><details>
+<summary>Tool use: **file_search**</summary>
+
+Searched for files matching `**/src/test/**/*.java`, no matches
+
+**Input:**
+
+- query: `src/test/**/*.java`
+
+**Result:**
+
+```
+No files found
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketRepository.java`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/repository/TicketRepository.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.repository;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+
+public interface TicketRepository extends JpaRepository<Ticket, UUID> {
+
+	List<Ticket> findByStatus(TicketStatus status);
+
+	List<Ticket> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+			String titleKeyword, String descriptionKeyword);
+
+	List<Ticket> findByStatusAndTitleContainingIgnoreCaseOrStatusAndDescriptionContainingIgnoreCase(
+			TicketStatus titleStatus, String titleKeyword, TicketStatus descriptionStatus, String descriptionKeyword);
+
+	default List<Ticket> findByFilters(String keyword, TicketStatus status) {
+		if (keyword == null || keyword.isBlank()) {
+			return status == null ? findAll() : findByStatus(status);
+		}
+
+		if (status == null) {
+			return findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(keyword, keyword);
+		}
+
+		return findByStatusAndTitleContainingIgnoreCaseOrStatusAndDescriptionContainingIgnoreCase(
+				status, keyword, status, keyword);
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CreateTicketRequest.java`
+
+**Input:**
+
+- endLine: `160`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/CreateTicketRequest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import com.supportticket.entity.Priority;
+
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record CreateTicketRequest(
+		@NotBlank(message = "Title is required")
+		@Size(min = 1, max = 200, message = "Title must contain 1-200 characters")
+		String title,
+		@NotBlank(message = "Description is required")
+		@Size(min = 1, max = 2000, message = "Description must contain 1-2000 characters")
+		String description,
+		@NotNull(message = "Priority is required")
+		Priority priority,
+		String assignee) {
+
+	@JsonAnySetter
+	public void rejectUnknownProperty(String name, JsonNode value) {
+		throw new IllegalArgumentException("Unrecognized request field");
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `UpdateTicketRequest.java`
+
+**Input:**
+
+- endLine: `160`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/UpdateTicketRequest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import com.supportticket.entity.Priority;
+
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record UpdateTicketRequest(
+		@NotBlank(message = "Title is required")
+		@Size(min = 1, max = 200, message = "Title must contain 1-200 characters")
+		String title,
+		@NotBlank(message = "Description is required")
+		@Size(min = 1, max = 2000, message = "Description must contain 1-2000 characters")
+		String description,
+		@NotNull(message = "Priority is required")
+		Priority priority,
+		String assignee) {
+
+	@JsonAnySetter
+	public void rejectUnknownProperty(String name, JsonNode value) {
+		throw new IllegalArgumentException("Unrecognized request field");
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketResponse.java`
+
+**Input:**
+
+- endLine: `180`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/TicketResponse.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.TicketStatus;
+
+public record TicketResponse(
+		UUID id,
+		String title,
+		String description,
+		Priority priority,
+		TicketStatus status,
+		String assignee,
+		Instant createdAt,
+		Instant updatedAt,
+		@JsonInclude(JsonInclude.Include.NON_NULL) List<CommentResponse> comments) {
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CommentResponse.java`
+
+**Input:**
+
+- endLine: `120`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/CommentResponse.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import java.time.Instant;
+import java.util.UUID;
+
+public record CommentResponse(
+		UUID id,
+		UUID ticketId,
+		String author,
+		String content,
+		Instant createdAt) {
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketNotFoundException.java`
+
+**Input:**
+
+- endLine: `100`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/TicketNotFoundException.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.exception;
+
+public class TicketNotFoundException extends RuntimeException {
+
+	public TicketNotFoundException() {
+		super("Ticket not found");
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `InvalidStatusTransitionException.java`
+
+**Input:**
+
+- endLine: `100`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.exception;
+
+public class InvalidStatusTransitionException extends RuntimeException {
+
+	public InvalidStatusTransitionException() {
+		super("Invalid ticket status transition");
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The nearby repository already exposes all five list/filter combinations via , and the service stub has no current implementation or test tree. I’m verifying Ticket’s mutation/generated-field API and exception usages; the implementation will delegate filtering to the repository, validate the same request DTO constraints, and use a closed explicit transition map so rejects happen before mutation or save.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `Ticket.java`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/entity/Ticket.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.entity;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+@Entity
+@Table(name = "tickets")
+public class Ticket {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	private UUID id;
+
+	@NotBlank
+	@Size(min = 1, max = 200)
+	@Column(nullable = false, length = 200)
+	private String title;
+
+	@NotBlank
+	@Size(min = 1, max = 2000)
+	@Column(nullable = false, length = 2000)
+	private String description;
+
+	@NotNull
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private Priority priority;
+
+	@NotNull
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false)
+	private TicketStatus status = TicketStatus.OPEN;
+
+	@Lob
+	private String assignee;
+
+	@CreationTimestamp
+	@Column(nullable = false, updatable = false)
+	private Instant createdAt;
+
+	@UpdateTimestamp
+	@Column(nullable = false)
+	private Instant updatedAt;
+
+	@OneToMany(mappedBy = "ticket", fetch = FetchType.LAZY)
+	private List<Comment> comments = new ArrayList<>();
+
+	protected Ticket() {
+	}
+
+	public Ticket(String title, String description, Priority priority, String assignee) {
+		this.title = title;
+		this.description = description;
+		this.priority = priority;
+		this.assignee = assignee;
+	}
+
+	public UUID getId() {
+		return id;
+	}
+
+	public String getTitle() {
+		return title;
+	}
+
+	public void setTitle(String 
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="search" data-tool-name="grep_search"><details>
+<summary>Tool use: **grep_search**</summary>
+
+Searched for text `InvalidStatusTransitionException`, 14 results
+
+**Input:**
+
+- isRegexp: `false`
+- query: `InvalidStatusTransitionException`
+
+**Result:**
+
+```
+Found 14 matches in 3 files for "InvalidStatusTransitionException"
+
+.specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+3809:<summary>Edit: **InvalidStatusTransitionException.java**</summary>
+3816:public class InvalidStatusTransitionException extends RuntimeException {
+3818:	public InvalidStatusTransitionException() {
+3895:	@ExceptionHandler(InvalidStatusTransitionException.class)
+3897:			InvalidStatusTransitionException exception, HttpServletRequest request) {
+4377:var conflict = handler.handleInvalidStatusTransition(new InvalidStatusTransitionException(), request).getBody();
+4567:	@ExceptionHandler(InvalidStatusTransitionException.class)
+4569:			InvalidStatusTransitionException exception, HttpServletRequest request) {
+4881:- `src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java`
+5152:Read `InvalidStatusTransitionException.java`
+
+src/main/java/com/supportticket/exception/ApiExceptionHandler.java
+78:	@ExceptionHandler(InvalidStatusTransitionException.class)
+80:			InvalidStatusTransitionException exception, HttpServletRequest request) {
+
+src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java
+3:public class InvalidStatusTransitionException extends RuntimeException {
+5:	public InvalidStatusTransitionException() {
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="search" data-tool-name="file_search"><details>
+<summary>Tool use: **file_search**</summary>
+
+Searched for files matching `**/src/test/**/*.java`, no matches
+
+**Input:**
+
+- query: `src/test/**/*.java`
+
+**Result:**
+
+```
+No files found
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketStatus.java`
+
+**Input:**
+
+- endLine: `90`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/entity/TicketStatus.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.entity;
+
+public enum TicketStatus {
+	OPEN,
+	IN_PROGRESS,
+	RESOLVED,
+	CLOSED,
+	CANCELLED
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The Ticket entity has setters only for editable fields/status; its UUID and timestamps have no setters, and the not-found exception already exists. There’s no test tree, so I’ll add one focused service test covering create/update behavior, every allowed and disallowed status pair, blank-search delegation, validation, and missing tickets. The service will rely on repository persistence for generated IDs/timestamps and will throw before `save` for invalid transitions.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketService.java**</summary>
+
+@@ lines 1-1 @@
+
+```
+package com.supportticket.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class TicketService {
+
+	private static final Map<TicketStatus, Set<TicketStatus>> ALLOWED_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public TicketService(TicketRepository ticketRepository, Validator validator) {
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public TicketResponse createTicket(CreateTicketRequest request) {
+		validate(request);
+		Ticket ticket = new Ticket(request.title(), request.description(), request.priority(), request.assignee());
+		ticket.setStatus(TicketStatus.OPEN);
+		return toResponse(ticketRepository.save(ticket));
+	}
+
+	@Transactional(readOnly = true)
+	public TicketResponse getTicketById(UUID ticketId) {
+		return ticketRepository.findById(ticketId)
+				.map(this::toResponse)
+				.orElseThrow(TicketNotFoundException::new);
+	}
+
+	@Transactional(readOnly = true)
+	public List<TicketResponse> listTickets(String keyword, TicketStatus status) {
+		return ticketRepository.findByFilters(keyword, status).stream()
+				.map(this::toResponse)
+				.toList();
+	}
+
+	@Transactional
+	public TicketResponse updateTicket(UUID ticketId, UpdateTicketRequest request) {
+		validate(request);
+		Ticket ticket = findTicket(ticketId);
+		ticket.setTitle(request.title());
+		ticket.setDescription(request.description());
+		ticket.setPriority(request.priority());
+		ticket.setAssignee(request.assignee());
+		return toResponse(ticketRepository.save(ticket));
+	}
+
+	@Transactional
+	public TicketResponse changeTicketStatus(UUID ticketId, TicketStatus requestedStatus) {
+		Ticket ticket = findTicket(ticketId);
+		TicketStatus currentStatus = ticket.getStatus();
+		Set<TicketStatus> allowedStatuses = ALLOWED_TRANSITIONS.get(currentStatus);
+		if (requestedStatus == null || allowedStatuses == null || !allowedStatuses.contains(requestedStatus)) {
+			throw new InvalidStatusTransitionException(currentStatus, requestedStatus);
+		}
+
+		ticket.setStatus(requestedStatus);
+		return toResponse(ticketRepository.save(ticket));
+	}
+
+	private Ticket findTicket(UUID ticketId) {
+		return ticketRepository.findById(ticketId).orElseThrow(TicketNotFoundException::new);
+	}
+
+	private <T> void validate(T request) {
+		var violations = validator.validate(request);
+		if (!violations.isEmpty()) {
+			throw new ConstraintViolationException(violations);
+		}
+	}
+
+	private TicketResponse toResponse(Ticket ticket) {
+		return new TicketResponse(
+				ticket.getId(),
+				ticket.getTitle(),
+				ticket.getDescription(),
+				ticket.getPriority(),
+				ticket.getStatus(),
+				ticket.getAssignee(),
+				ticket.getCreatedAt(),
+				ticket.getUpdatedAt(),
+				null);
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **InvalidStatusTransitionException.java**</summary>
+
+@@ lines 1-15 @@
+
+```
+package com.supportticket.exception;
+
+import com.supportticket.entity.TicketStatus;
+
+public class InvalidStatusTransitionException extends RuntimeException {
+
+	public InvalidStatusTransitionException() {
+		super("Invalid ticket status transition");
+	}
+
+	public InvalidStatusTransitionException(TicketStatus currentStatus, TicketStatus requestedStatus) {
+		super("Ticket cannot transition from " + currentStatus + " to " + requestedStatus);
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketServiceTest.java**</summary>
+
+@@ lines 1-1 @@
+
+```
+package com.supportticket.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+
+class TicketServiceTest {
+
+	private static final ValidatorFactory VALIDATOR_FACTORY = Validation.buildDefaultValidatorFactory();
+	private static final Map<TicketStatus, Set<TicketStatus>> VALID_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+	private static final UUID TICKET_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+
+	private TicketRepository ticketRepository;
+	private TicketService ticketService;
+
+	@BeforeEach
+	void setUp() {
+		ticketRepository = mock(TicketRepository.class);
+		ticketService = new TicketService(ticketRepository, VALIDATOR_FACTORY.getValidator());
+	}
+
+	@AfterAll
+	static void closeValidatorFactory() {
+		VALIDATOR_FACTORY.close();
+	}
+
+	@Test
+	void createsTicketWithOpenStatusAndApprovedFields() {
+		when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		TicketResponse response = ticketService.createTicket(
+				new CreateTicketRequest("Login issue", "Cannot sign in", Priority.HIGH, "Support"));
+
+		verify(ticketRepository).save(any(Ticket.class));
+		assertEquals(TicketStatus.OPEN, response.status());
+		assertEquals("Login issue", response.title());
+		assertEquals("Cannot sign in", response.description());
+		assertEquals(Priority.HIGH, response.priority());
+		assertEquals("Support", response.assignee());
+	}
+
+	@Test
+	void rejectsInvalidCreateRequestBeforeSaving() {
+		assertThrows(ConstraintViolationException.class, () -> ticketService.createTicket(
+				new CreateTicketRequest("", "A description", null, null)));
+
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	@Test
+	void getsTicketByIdOrThrowsWhenMissing() {
+		Ticket ticket = ticketWithStatus(TicketStatus.OPEN);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+
+		assertEquals(TicketStatus.OPEN, ticketService.getTicketById(TICKET_ID).status());
+
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
+		assertThrows(TicketNotFoundException.class, () -> ticketService.getTicketById(TICKET_ID));
+	}
+
+	@Test
+	void delegatesKeywordAndStatusFiltersToRepository() {
+		when(ticketRepository.findByFilters(" \t ", TicketStatus.OPEN)).thenReturn(java.util.List.of());
+
+		assertEquals(java.util.List.of(), ticketService.listTickets(" \t ", TicketStatus.OPEN));
+
+		verify(ticketRepository).findByFilters(" \t ", TicketStatus.OPEN);
+	}
+
+	@Test
+	void updatesOnlyEditableTicketFields() {
+		Ticket ticket = ticketWithStatus(TicketStatus.IN_PROGRESS);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+		when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		TicketResponse response = ticketService.updateTicket(TICKET_ID,
+				new UpdateTicketRequest("Updated title", "Updated description", Priority.CRITICAL, null));
+
+		assertEquals("Updated title", ticket.getTitle());
+		assertEquals("Updated description", ticket.getDescription());
+		assertEquals(Priority.CRITICAL, ticket.getPriority());
+		assertEquals(null, ticket.getAssignee());
+		assertEquals(TicketStatus.IN_PROGRESS, ticket.getStatus());
+		assertEquals(TicketStatus.IN_PROGRESS, response.status());
+		verify(ticketRepository).save(ticket);
+	}
+
+	@Test
+	void updateOfMissingTicketThrowsNotFoundWithoutSaving() {
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
+
+		assertThrows(TicketNotFoundException.class, () -> ticketService.updateTicket(TICKET_ID,
+				new UpdateTicketRequest("Title", "Description", Priority.LOW, null)));
+
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	@ParameterizedTest
+	@MethodSource("validTransitions")
+	void appliesEveryAllowedStatusTransition(TicketStatus currentStatus, TicketStatus requestedStatus) {
+		Ticket ticket = ticketWithStatus(currentStatus);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+		when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		assertEquals(requestedStatus, ticketService.changeTicketStatus(TICKET_ID, requestedStatus).status());
+		verify(ticketRepository).save(ticket);
+	}
+
+	@ParameterizedTest
+	@MethodSource("invalidTransitions")
+	void rejectsEveryOtherTransitionWithoutChangingOrSaving(TicketStatus currentStatus,
+			TicketStatus requestedStatus) {
+		Ticket ticket = ticketWithStatus(currentStatus);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+
+		InvalidStatusTransitionException exception = assertThrows(InvalidStatusTransitionException.class,
+				() -> ticketService.changeTicketStatus(TICKET_ID, requestedStatus));
+
+		assertEquals(currentStatus, ticket.getStatus());
+		assertEquals("Ticket cannot transition from " + currentStatus + " to " + requestedStatus,
+				exception.getMessage());
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	private static Stream<Arguments> validTransitions() {
+		return Stream.of(
+				Arguments.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS),
+				Arguments.of(TicketStatus.OPEN, TicketStatus.CANCELLED),
+				Arguments.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED),
+				Arguments.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+				Arguments.of(TicketStatus.RESOLVED, TicketStatus.CLOSED));
+	}
+
+	private static Stream<Arguments> invalidTransitions() {
+		return Arrays.stream(TicketStatus.values())
+				.flatMap(currentStatus -> Arrays.stream(TicketStatus.values())
+						.filter(requestedStatus -> !VALID_TRANSITIONS.get(currentStatus).contains(requestedStatus))
+						.map(requestedStatus -> Arguments.of(currentStatus, requestedStatus)));
+	}
+
+	private Ticket ticketWithStatus(TicketStatus status) {
+		Ticket ticket = new Ticket("Original title", "Original description", Priority.MEDIUM, "Original assignee");
+		ticket.setStatus(status);
+		return ticket;
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The service and focused state-machine tests are in place. Every allowed transition is explicit, and the invalid path throws before the entity is changed or `save` is called; I’m attempting the project test command first, then I’ll use the locally cached Java/JUnit tools if Maven is still unavailable.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` mvn test`
+
+Run the project test suite, including the new service transition tests.
+
+```bash
+mvn test
+```
+
+**Result:**
+
+```
+Command 'mvn' not found, but can be installed with:
+sudo apt install maven
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+`mvn test` remains unavailable. I’m checking compiler diagnostics and compiling both production and test sources against the cached dependency jars; I’ll also locate a JUnit launcher so the new transition matrix can actually run rather than stop at compilation.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` mkdir -p /tmp/c2jir-ticket-step12-classes /tmp/c2jir-ticket-step12-test-clas...`
+
+Compile all production and JUnit test sources using Java 21 and cached dependencies.
+
+```bash
+mkdir -p /tmp/c2jir-ticket-step12-classes /tmp/c2jir-ticket-step12-test-classes && dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step12-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step12-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step12-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+
+
+Command produced no output
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` find "$HOME/.m2/repository/org/junit/platform" -type f -name '\*.jar' -print ...`
+
+Locate cached JUnit Platform launcher/engine artifacts for executing tests without Maven.
+
+```bash
+find "$HOME/.m2/repository/org/junit/platform" -type f -name '*.jar' -print 2>/dev/null; find "$HOME/.m2/repository/org/junit" -type f -name '*.jar' -print 2>/dev/null | wc -l
+```
+
+**Result:**
+
+```
+/home/sandeep/.m2/repository/org/junit/platform/junit-platform-commons/1.12.2/ju
+nit-platform-commons-1.12.2.jar
+/home/sandeep/.m2/repository/org/junit/platform/junit-platform-engine/1.12.2/jun
+it-platform-engine-1.12.2.jar
+6
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `TicketService.java`, `InvalidStatusTransitionException.java`, `TicketServiceTest.java`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Production and test sources compile cleanly, and no JUnit launcher jar is cached, so Maven/JUnit’s normal runner cannot be invoked here. I’m executing the compiled focused tests directly against the test class methods (including all 25 state pairs) to still verify the same behavior without changing dependencies or the project build.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Run the compiled service tests directly, including each valid and invalid status pair, because Maven and the JUnit launcher are unavailable.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-classes:/tmp/c2jir-ticket-step12-test-classes:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.stream.*;
+import org.junit.jupiter.params.provider.Arguments;
+Class<?> testClass = Class.forName("com.supportticket.service.TicketServiceTest");
+Constructor<?> constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(true);
+Method setup = testClass.getDeclaredMethod("setUp"); setup.setAccessible(true);
+void invokeTest(Class<?> type, Constructor<?> ctor, Method before, String name, Object... args) throws Exception { var instance = ctor.newInstance(); before.invoke(instance); var method = Arrays.stream(type.getDeclaredMethods()).filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow(); method.setAccessible(true); try { method.invoke(instance, args); } catch (InvocationTargetException exception) { throw new RuntimeException(exception.getCause()); } }
+int runCount = 0;
+for (var name : List.of("createsTicketWithOpenStatusAndApprovedFields", "rejectsInvalidCreateRequestBeforeSaving", "getsTicketByIdOrThrowsWhenMissing", "delegatesKeywordAndStatusFiltersToRepository", "updatesOnlyEditableTicketFields", "updateOfMissingTicketThrowsNotFoundWithoutSaving")) { invokeTest(testClass, constructor, setup, name); runCount++; }
+for (var sourceName : List.of("validTransitions", "invalidTransitions")) { var source = testClass.getDeclaredMethod(sourceName); source.setAccessible(true); var arguments = (Stream<Arguments>) source.invoke(null); var testName = sourceName.equals("validTransitions") ? "appliesEveryAllowedStatusTransition" : "rejectsEveryOtherTransitionWithoutChangingOrSaving"; for (var argument : arguments.toList()) { invokeTest(testClass, constructor, setup, testName, argument.get()); runCount++; } }
+testClass.getDeclaredMethod("closeValidatorFactory").invoke(null);
+System.out.println("Passed " + runCount + " compiled TicketService test invocations");
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-c
+lasses:/tmp/c2jir-ticket-step12-test-classes:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.stream.*;
+import org.junit.jupiter.params.provider.Arguments;
+Class<?> testClass = Class.forName("com.supportticket.service.TicketServiceTest"
+);
+Constructor<?> constructor = testClass.getDeclaredConstructor(); constructor.set
+Accessible(true);
+Method setup = testClass.getDeclaredMethod("setUp"); setup.setAccessible(true);
+void invokeTest(Class<?> type, Constructor<?> ctor, Method before, String name,
+Object... args) throws Exception { var instance = ctor.newInstance(); before.inv
+oke(instance); var method = Arrays.stream(type.getDeclaredMethods()).filter(cand
+idate -> candidate.getName().equals(name)).findFirst().orElseThrow(); method.set
+Accessible(true); try { method.invoke(instance, args); } catch (InvocationTarget
+Exception exception) { throw new RuntimeException(exception.getCause()); } }
+int runCount = 0;
+for (var name : List.of("createsTicketWithOpenStatusAndApprovedFields", "rejects
+InvalidCreateRequestBeforeSaving", "getsTicketByIdOrThrowsWhenMissing", "delegat
+esKeywordAndStatusFiltersToRepository", "updatesOnlyEditableTicketFields", "upda
+teOfMissingTicketThrowsNotFoundWithoutSaving")) { invokeTest(testClass, construc
+tor, setup, name); runCount++; }
+for (var sourceName : List.of("validTransitions", "invalidTransitions")) { var s
+ource = testClass.getDeclaredMethod(sourceName); source.setAccessible(true); var
+ arguments = (Stream<Arguments>) source.invoke(null); var testName = sourceName.
+equals("validTransitions") ? "appliesEveryAllowedStatusTransition" : "rejectsEve
+ryOtherTransitionWithoutChangingOrSaving"; for (var argument : arguments.toList(
+)) { invokeTest(testClass, con
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The compiled service tests passed all 31 invocations: six use-case checks, five allowed transitions, and all 20 remaining state pairs rejected without saving. I’m now verifying Spring wiring and real H2-generated IDs/timestamps through the service bean, then I’ll do a final scope/error check.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Verify the injected service against in-memory H2, including generated UUID/timestamps, persisted update fields, status preservation, retrieval, and status-only listing.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.util.UUID;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.service.TicketService;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(WebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step12-service;DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var service = context.getBean(TicketService.class);
+var created = service.createTicket(new CreateTicketRequest("Service test", "Persist generated values", Priority.MEDIUM, null));
+if (created.id() == null || created.createdAt() == null || created.updatedAt() == null || created.status() != TicketStatus.OPEN) throw new AssertionError("create did not return generated values/default status");
+var updated = service.updateTicket(created.id(), new UpdateTicketRequest("Changed", "Persist generated values", Priority.HIGH, "Team"));
+if (updated.id() == null || updated.createdAt() == null || updated.updatedAt() == null || updated.status() != TicketStatus.OPEN || !"Team".equals(updated.assignee())) throw new AssertionError("update changed a protected field or lost generated values");
+if (!service.getTicketById(created.id()).title().equals("Changed")) throw new AssertionError("ticket lookup did not return persisted update");
+if (service.listTickets(" ", TicketStatus.OPEN).size() != 1) throw new AssertionError("status-only list failed");
+System.out.println("Spring-wired TicketService and real H2 persistence checks passed");
+context.close();
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import java.util.UUID;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.service.TicketService;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step12-service;
+DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var service = context.getBean(TicketService.class);
+var created = service.createTicket(new CreateTicketRequest("Service test", "Pers
+ist generated values", Priority.MEDIUM, null));
+if (created.id() == null || created.createdAt() == null || created.updatedAt() =
+= null || created.status() != TicketStatus.OPEN) throw new AssertionError("creat
+e did not return generated values/default status");
+var updated = service.updateTicket(created.id(), new UpdateTicketRequest("Change
+d", "Persist generated values", Priority.HIGH, "Team"));
+if (updated.id() == null || updated.createdAt() == null || updated.updatedAt() =
+= null || updated.status() != TicketStatus.OPEN || !"Team".equals(updated.assign
+ee())) throw new AssertionError("update changed a protected field or lost genera
+ted values");
+if (!service.getTicketById(created.id()).title().equals("Changed")) throw new As
+sertionError("ticket lookup did not return persisted update");
+if (service.listTickets(" ", TicketStatus.OPEN).size() != 1) throw new Assertion
+Error("status-only list failed");
+System.out.println("Spring-wired TicketService and real H2 persistence checks pa
+EOFitxt.close();
+|  Welcome to JS
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short`
+
+Check that only service, exception, and focused test files were added or changed by this step.
+
+```bash
+git status --short
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `TicketService.java`, `InvalidStatusTransitionException.java`, `TicketServiceTest.java`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `content.txt`
+
+**Input:**
+
+- endLine: `220`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_5fQU6rA1D1tJIEIhRvfF7cgQ__vscode-1790509702596/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import java.util.UUID;
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.service.TicketService;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step12-service;
+DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var service = context.getBean(TicketService.class);
+var created = service.createTicket(new CreateTicketRequest("Service test", "Pers
+ist generated values", Priority.MEDIUM, null));
+if (created.id() == null || created.createdAt() == null || created.updatedAt() =
+= null || created.status() != TicketStatus.OPEN) throw new AssertionError("creat
+e did not return generated values/default status");
+var updated = service.updateTicket(created.id(), new UpdateTicketRequest("Change
+d", "Persist generated values", Priority.HIGH, "Team"));
+if (updated.id() == null || updated.createdAt() == null || updated.updatedAt() =
+= null || updated.status() != TicketStatus.OPEN || !"Team".equals(updated.assign
+ee())) throw new AssertionError("update changed a protected field or lost genera
+ted values");
+if (!service.getTicketById(created.id()).title().equals("Changed")) throw new As
+sertionError("ticket lookup did not return persisted update");
+if (service.listTickets(" ", TicketStatus.OPEN).size() != 1) throw new Assertion
+Error("status-only list failed");
+System.out.println("Spring-wired TicketService and real H2 persistence checks pa
+EOFitxt.close();
+|  Welcome to JS
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The real H2 check caught an important defect: UUID generation happened on `save`, but / were still null when the response DTO was mapped before flush. I’m changing mutating service operations to `saveAndFlush` so Hibernate-generated values are available in returned responses, and updating the unit-test stubs/verifications to match.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketService.java**</summary>
+
+@@ lines 1-112 @@
+
+```
+package com.supportticket.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class TicketService {
+
+	private static final Map<TicketStatus, Set<TicketStatus>> ALLOWED_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public TicketService(TicketRepository ticketRepository, Validator validator) {
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public TicketResponse createTicket(CreateTicketRequest request) {
+		validate(request);
+		Ticket ticket = new Ticket(request.title(), request.description(), request.priority(), request.assignee());
+		ticket.setStatus(TicketStatus.OPEN);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional(readOnly = true)
+	public TicketResponse getTicketById(UUID ticketId) {
+		return ticketRepository.findById(ticketId)
+				.map(this::toResponse)
+				.orElseThrow(TicketNotFoundException::new);
+	}
+
+	@Transactional(readOnly = true)
+	public List<TicketResponse> listTickets(String keyword, TicketStatus status) {
+		return ticketRepository.findByFilters(keyword, status).stream()
+				.map(this::toResponse)
+				.toList();
+	}
+
+	@Transactional
+	public TicketResponse updateTicket(UUID ticketId, UpdateTicketRequest request) {
+		validate(request);
+		Ticket ticket = findTicket(ticketId);
+		ticket.setTitle(request.title());
+		ticket.setDescription(request.description());
+		ticket.setPriority(request.priority());
+		ticket.setAssignee(request.assignee());
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional
+	public TicketResponse changeTicketStatus(UUID ticketId, TicketStatus requestedStatus) {
+		Ticket ticket = findTicket(ticketId);
+		TicketStatus currentStatus = ticket.getStatus();
+		Set<TicketStatus> allowedStatuses = ALLOWED_TRANSITIONS.get(currentStatus);
+		if (requestedStatus == null || allowedStatuses == null || !allowedStatuses.contains(requestedStatus)) {
+			throw new InvalidStatusTransitionException(currentStatus, requestedStatus);
+		}
+
+		ticket.setStatus(requestedStatus);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	private Ticket findTicket(UUID ticketId) {
+		return ticketRepository.findById(ticketId).orElseThrow(TicketNotFoundException::new);
+	}
+
+	private <T> void validate(T request) {
+		var violations = validator.validate(request);
+		if (!violations.isEmpty()) {
+			throw new ConstraintViolationException(violations);
+		}
+	}
+
+	private TicketResponse toResponse(Ticket ticket) {
+		return new TicketResponse(
+				ticket.getId(),
+				ticket.getTitle(),
+				ticket.getDescription(),
+				ticket.getPriority(),
+				ticket.getStatus(),
+				ticket.getAssignee(),
+				ticket.getCreatedAt(),
+				ticket.getUpdatedAt(),
+				null);
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketServiceTest.java**</summary>
+
+@@ lines 1-184 @@
+
+```
+package com.supportticket.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+
+class TicketServiceTest {
+
+	private static final ValidatorFactory VALIDATOR_FACTORY = Validation.buildDefaultValidatorFactory();
+	private static final Map<TicketStatus, Set<TicketStatus>> VALID_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+	private static final UUID TICKET_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+
+	private TicketRepository ticketRepository;
+	private TicketService ticketService;
+
+	@BeforeEach
+	void setUp() {
+		ticketRepository = mock(TicketRepository.class);
+		ticketService = new TicketService(ticketRepository, VALIDATOR_FACTORY.getValidator());
+	}
+
+	@AfterAll
+	static void closeValidatorFactory() {
+		VALIDATOR_FACTORY.close();
+	}
+
+	@Test
+	void createsTicketWithOpenStatusAndApprovedFields() {
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		TicketResponse response = ticketService.createTicket(
+				new CreateTicketRequest("Login issue", "Cannot sign in", Priority.HIGH, "Support"));
+
+		verify(ticketRepository).saveAndFlush(any(Ticket.class));
+		assertEquals(TicketStatus.OPEN, response.status());
+		assertEquals("Login issue", response.title());
+		assertEquals("Cannot sign in", response.description());
+		assertEquals(Priority.HIGH, response.priority());
+		assertEquals("Support", response.assignee());
+	}
+
+	@Test
+	void rejectsInvalidCreateRequestBeforeSaving() {
+		assertThrows(ConstraintViolationException.class, () -> ticketService.createTicket(
+				new CreateTicketRequest("", "A description", null, null)));
+
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	@Test
+	void getsTicketByIdOrThrowsWhenMissing() {
+		Ticket ticket = ticketWithStatus(TicketStatus.OPEN);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+
+		assertEquals(TicketStatus.OPEN, ticketService.getTicketById(TICKET_ID).status());
+
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
+		assertThrows(TicketNotFoundException.class, () -> ticketService.getTicketById(TICKET_ID));
+	}
+
+	@Test
+	void delegatesKeywordAndStatusFiltersToRepository() {
+		when(ticketRepository.findByFilters(" \t ", TicketStatus.OPEN)).thenReturn(java.util.List.of());
+
+		assertEquals(java.util.List.of(), ticketService.listTickets(" \t ", TicketStatus.OPEN));
+
+		verify(ticketRepository).findByFilters(" \t ", TicketStatus.OPEN);
+	}
+
+	@Test
+	void updatesOnlyEditableTicketFields() {
+		Ticket ticket = ticketWithStatus(TicketStatus.IN_PROGRESS);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		TicketResponse response = ticketService.updateTicket(TICKET_ID,
+				new UpdateTicketRequest("Updated title", "Updated description", Priority.CRITICAL, null));
+
+		assertEquals("Updated title", ticket.getTitle());
+		assertEquals("Updated description", ticket.getDescription());
+		assertEquals(Priority.CRITICAL, ticket.getPriority());
+		assertEquals(null, ticket.getAssignee());
+		assertEquals(TicketStatus.IN_PROGRESS, ticket.getStatus());
+		assertEquals(TicketStatus.IN_PROGRESS, response.status());
+		verify(ticketRepository).saveAndFlush(ticket);
+	}
+
+	@Test
+	void updateOfMissingTicketThrowsNotFoundWithoutSaving() {
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
+
+		assertThrows(TicketNotFoundException.class, () -> ticketService.updateTicket(TICKET_ID,
+				new UpdateTicketRequest("Title", "Description", Priority.LOW, null)));
+
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	@ParameterizedTest
+	@MethodSource("validTransitions")
+	void appliesEveryAllowedStatusTransition(TicketStatus currentStatus, TicketStatus requestedStatus) {
+		Ticket ticket = ticketWithStatus(currentStatus);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		assertEquals(requestedStatus, ticketService.changeTicketStatus(TICKET_ID, requestedStatus).status());
+		verify(ticketRepository).saveAndFlush(ticket);
+	}
+
+	@ParameterizedTest
+	@MethodSource("invalidTransitions")
+	void rejectsEveryOtherTransitionWithoutChangingOrSaving(TicketStatus currentStatus,
+			TicketStatus requestedStatus) {
+		Ticket ticket = ticketWithStatus(currentStatus);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+
+		InvalidStatusTransitionException exception = assertThrows(InvalidStatusTransitionException.class,
+				() -> ticketService.changeTicketStatus(TICKET_ID, requestedStatus));
+
+		assertEquals(currentStatus, ticket.getStatus());
+		assertEquals("Ticket cannot transition from " + currentStatus + " to " + requestedStatus,
+				exception.getMessage());
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	private static Stream<Arguments> validTransitions() {
+		return Stream.of(
+				Arguments.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS),
+				Arguments.of(TicketStatus.OPEN, TicketStatus.CANCELLED),
+				Arguments.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED),
+				Arguments.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+				Arguments.of(TicketStatus.RESOLVED, TicketStatus.CLOSED));
+	}
+
+	private static Stream<Arguments> invalidTransitions() {
+		return Arrays.stream(TicketStatus.values())
+				.flatMap(currentStatus -> Arrays.stream(TicketStatus.values())
+						.filter(requestedStatus -> !VALID_TRANSITIONS.get(currentStatus).contains(requestedStatus))
+						.map(requestedStatus -> Arguments.of(currentStatus, requestedStatus)));
+	}
+
+	private Ticket ticketWithStatus(TicketStatus status) {
+		Ticket ticket = new Ticket("Original title", "Original description", Priority.MEDIUM, "Original assignee");
+		ticket.setStatus(status);
+		return ticket;
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Recompile production and focused tests after switching mutations to saveAndFlush.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step12-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step12-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step12-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step12-classes $(find src/main/java -name '*.java') && java
+c --release 21 -cp "/tmp/c2jir-ticket-step12-classes:$dependency_classpath" -d /
+tmp/c2jir-ticket-step12-test-classes $(find src/test/java -name '*.java')
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Re-run service integration checks after flushing writes, including generated values in create responses and unchanged status after a rejected transition.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.service.TicketService;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(WebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step12-service;DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var service = context.getBean(TicketService.class);
+var created = service.createTicket(new CreateTicketRequest("Service test", "Persist generated values", Priority.MEDIUM, null));
+var checksPassed = created.id() != null && created.createdAt() != null && created.updatedAt() != null && created.status() == TicketStatus.OPEN;
+var updated = service.updateTicket(created.id(), new UpdateTicketRequest("Changed", "Persist generated values", Priority.HIGH, "Team"));
+checksPassed &= updated.id() != null && updated.createdAt() != null && updated.updatedAt() != null && updated.status() == TicketStatus.OPEN && "Team".equals(updated.assignee());
+checksPassed &= service.getTicketById(created.id()).title().equals("Changed");
+checksPassed &= service.listTickets(" ", TicketStatus.OPEN).size() == 1;
+try { service.changeTicketStatus(created.id(), TicketStatus.CLOSED); checksPassed = false; } catch (InvalidStatusTransitionException exception) { checksPassed &= exception.getMessage().contains("OPEN") && exception.getMessage().contains("CLOSED"); }
+checksPassed &= service.getTicketById(created.id()).status() == TicketStatus.OPEN;
+System.out.println("Real H2 service checks " + (checksPassed ? "passed" : "FAILED"));
+context.close();
+if (!checksPassed) System.exit(1);
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.service.TicketService;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step12-service;
+DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var service = context.getBean(TicketService.class);
+var created = service.createTicket(new CreateTicketRequest("Service test", "Pers
+ist generated values", Priority.MEDIUM, null));
+var checksPassed = created.id() != null && created.createdAt() != null && create
+d.updatedAt() != null && created.status() == TicketStatus.OPEN;
+var updated = service.updateTicket(created.id(), new UpdateTicketRequest("Change
+d", "Persist generated values", Priority.HIGH, "Team"));
+checksPassed &= updated.id() != null && updated.createdAt() != null && updated.u
+pdatedAt() != null && updated.status() == TicketStatus.OPEN && "Team".equals(upd
+ated.assignee());
+checksPassed &= service.getTicketById(created.id()).title().equals("Changed");
+checksPassed &= service.listTickets(" ", TicketStatus.OPEN).size() == 1;
+try { service.changeTicketStatus(created.id(), TicketStatus.CLOSED); checksPasse
+d = false; } catch (InvalidStatusTransitionException exception) { checksPassed &
+= exception.getMessage().contains("OPEN") && exception.getMessage().contains("CL
+OSED"); }
+checksPassed &= service.getTicketById(created.id()).status() == Tick
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `content.txt`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_jfQ5Wrwjm03iIeHonjLS9T5Y__vscode-1790509702602/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-c
+lasses:src/main/resources:$dependency_classpath" <<'EOF'
+import org.springframework.boot.WebApplicationType;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import com.supportticket.SupportTicketApplication;
+import com.supportticket.dto.*;
+import com.supportticket.entity.*;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.service.TicketService;
+var context = new SpringApplicationBuilder(SupportTicketApplication.class).web(W
+ebApplicationType.NONE).run("--spring.datasource.url=jdbc:h2:mem:step12-service;
+DB_CLOSE_DELAY=-1", "--spring.jpa.hibernate.ddl-auto=create-drop");
+var service = context.getBean(TicketService.class);
+var created = service.createTicket(new CreateTicketRequest("Service test", "Pers
+ist generated values", Priority.MEDIUM, null));
+var checksPassed = created.id() != null && created.createdAt() != null && create
+d.updatedAt() != null && created.status() == TicketStatus.OPEN;
+var updated = service.updateTicket(created.id(), new UpdateTicketRequest("Change
+d", "Persist generated values", Priority.HIGH, "Team"));
+checksPassed &= updated.id() != null && updated.createdAt() != null && updated.u
+pdatedAt() != null && updated.status() == TicketStatus.OPEN && "Team".equals(upd
+ated.assignee());
+checksPassed &= service.getTicketById(created.id()).title().equals("Changed");
+checksPassed &= service.listTickets(" ", TicketStatus.OPEN).size() == 1;
+try { service.changeTicketStatus(created.id(), TicketStatus.CLOSED); checksPasse
+d = false; } catch (InvalidStatusTransitionException exception) { checksPassed &
+= exception.getMessage().contains("OPEN") && exception.getMessage().contains("CL
+OSED"); }
+checksPassed &= service.getTicketById(created.id()).status() == Tick
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The `saveAndFlush` fix now returns populated UUID/creation/update timestamps on create, and real H2 checks confirm editable updates persist while status remains ; a rejected transition leaves the persisted status unchanged. I’m rerunning the compiled unit-test methods against the updated repository calls, then I’ll report the Maven limitation and exact files.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Re-execute the compiled focused service tests after updating persistence calls, with all five valid and 20 invalid transitions.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-classes:/tmp/c2jir-ticket-step12-test-classes:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.stream.*;
+import org.junit.jupiter.params.provider.Arguments;
+Class<?> testClass = Class.forName("com.supportticket.service.TicketServiceTest");
+Constructor<?> constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(true);
+Method setup = testClass.getDeclaredMethod("setUp"); setup.setAccessible(true);
+void invokeTest(Class<?> type, Constructor<?> ctor, Method before, String name, Object... args) throws Exception { var instance = ctor.newInstance(); before.invoke(instance); var method = Arrays.stream(type.getDeclaredMethods()).filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow(); method.setAccessible(true); try { method.invoke(instance, args); } catch (InvocationTargetException exception) { throw new RuntimeException(exception.getCause()); } }
+int runCount = 0;
+for (var name : List.of("createsTicketWithOpenStatusAndApprovedFields", "rejectsInvalidCreateRequestBeforeSaving", "getsTicketByIdOrThrowsWhenMissing", "delegatesKeywordAndStatusFiltersToRepository", "updatesOnlyEditableTicketFields", "updateOfMissingTicketThrowsNotFoundWithoutSaving")) { invokeTest(testClass, constructor, setup, name); runCount++; }
+for (var sourceName : List.of("validTransitions", "invalidTransitions")) { var source = testClass.getDeclaredMethod(sourceName); source.setAccessible(true); var arguments = (Stream<Arguments>) source.invoke(null); var testName = sourceName.equals("validTransitions") ? "appliesEveryAllowedStatusTransition" : "rejectsEveryOtherTransitionWithoutChangingOrSaving"; for (var argument : arguments.toList()) { invokeTest(testClass, constructor, setup, testName, argument.get()); runCount++; } }
+var closeFactory = testClass.getDeclaredMethod("closeValidatorFactory"); closeFactory.setAccessible(true); closeFactory.invoke(null);
+System.out.println("Passed " + runCount + " compiled TicketService test invocations");
+if (runCount != 31) System.exit(1);
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step12-c
+lasses:/tmp/c2jir-ticket-step12-test-classes:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.stream.*;
+import org.junit.jupiter.params.provider.Arguments;
+Class<?> testClass = Class.forName("com.supportticket.service.TicketServiceTest"
+);
+Constructor<?> constructor = testClass.getDeclaredConstructor(); constructor.set
+Accessible(true);
+Method setup = testClass.getDeclaredMethod("setUp"); setup.setAccessible(true);
+void invokeTest(Class<?> type, Constructor<?> ctor, Method before, String name,
+Object... args) throws Exception { var instance = ctor.newInstance(); before.inv
+oke(instance); var method = Arrays.stream(type.getDeclaredMethods()).filter(cand
+idate -> candidate.getName().equals(name)).findFirst().orElseThrow(); method.set
+Accessible(true); try { method.invoke(instance, args); } catch (InvocationTarget
+Exception exception) { throw new RuntimeException(exception.getCause()); } }
+int runCount = 0;
+for (var name : List.of("createsTicketWithOpenStatusAndApprovedFields", "rejects
+InvalidCreateRequestBeforeSaving", "getsTicketByIdOrThrowsWhenMissing", "delegat
+esKeywordAndStatusFiltersToRepository", "updatesOnlyEditableTicketFields", "upda
+teOfMissingTicketThrowsNotFoundWithoutSaving")) { invokeTest(testClass, construc
+tor, setup, name); runCount++; }
+for (var sourceName : List.of("validTransitions", "invalidTransitions")) { var s
+ource = testClass.getDeclaredMethod(sourceName); source.setAccessible(true); var
+ arguments = (Stream<Arguments>) source.invoke(null); var testName = sourceName.
+equals("validTransitions") ? "appliesEveryAllowedStatusTransition" : "rejectsEve
+ryOtherTransitionWithoutChangingOrSaving"; for (var argument : arguments.toList(
+)) { invokeTest(testClass, con
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The new unit-test invocations pass after the flush change. I noticed one unused import and a null assertion style issue in the touched files; I’m cleaning those small details, then I’ll compile once more and capture the final changed-file list.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketService.java**</summary>
+
+@@ lines 1-111 @@
+
+```
+package com.supportticket.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class TicketService {
+
+	private static final Map<TicketStatus, Set<TicketStatus>> ALLOWED_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public TicketService(TicketRepository ticketRepository, Validator validator) {
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public TicketResponse createTicket(CreateTicketRequest request) {
+		validate(request);
+		Ticket ticket = new Ticket(request.title(), request.description(), request.priority(), request.assignee());
+		ticket.setStatus(TicketStatus.OPEN);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional(readOnly = true)
+	public TicketResponse getTicketById(UUID ticketId) {
+		return ticketRepository.findById(ticketId)
+				.map(this::toResponse)
+				.orElseThrow(TicketNotFoundException::new);
+	}
+
+	@Transactional(readOnly = true)
+	public List<TicketResponse> listTickets(String keyword, TicketStatus status) {
+		return ticketRepository.findByFilters(keyword, status).stream()
+				.map(this::toResponse)
+				.toList();
+	}
+
+	@Transactional
+	public TicketResponse updateTicket(UUID ticketId, UpdateTicketRequest request) {
+		validate(request);
+		Ticket ticket = findTicket(ticketId);
+		ticket.setTitle(request.title());
+		ticket.setDescription(request.description());
+		ticket.setPriority(request.priority());
+		ticket.setAssignee(request.assignee());
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional
+	public TicketResponse changeTicketStatus(UUID ticketId, TicketStatus requestedStatus) {
+		Ticket ticket = findTicket(ticketId);
+		TicketStatus currentStatus = ticket.getStatus();
+		Set<TicketStatus> allowedStatuses = ALLOWED_TRANSITIONS.get(currentStatus);
+		if (requestedStatus == null || allowedStatuses == null || !allowedStatuses.contains(requestedStatus)) {
+			throw new InvalidStatusTransitionException(currentStatus, requestedStatus);
+		}
+
+		ticket.setStatus(requestedStatus);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	private Ticket findTicket(UUID ticketId) {
+		return ticketRepository.findById(ticketId).orElseThrow(TicketNotFoundException::new);
+	}
+
+	private <T> void validate(T request) {
+		var violations = validator.validate(request);
+		if (!violations.isEmpty()) {
+			throw new ConstraintViolationException(violations);
+		}
+	}
+
+	private TicketResponse toResponse(Ticket ticket) {
+		return new TicketResponse(
+				ticket.getId(),
+				ticket.getTitle(),
+				ticket.getDescription(),
+				ticket.getPriority(),
+				ticket.getStatus(),
+				ticket.getAssignee(),
+				ticket.getCreatedAt(),
+				ticket.getUpdatedAt(),
+				null);
+	}
+}
+```
+
+@@ lines 111-112 @@ (deleted)
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketServiceTest.java**</summary>
+
+@@ lines 1-185 @@
+
+```
+package com.supportticket.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+
+class TicketServiceTest {
+
+	private static final ValidatorFactory VALIDATOR_FACTORY = Validation.buildDefaultValidatorFactory();
+	private static final Map<TicketStatus, Set<TicketStatus>> VALID_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+	private static final UUID TICKET_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+
+	private TicketRepository ticketRepository;
+	private TicketService ticketService;
+
+	@BeforeEach
+	void setUp() {
+		ticketRepository = mock(TicketRepository.class);
+		ticketService = new TicketService(ticketRepository, VALIDATOR_FACTORY.getValidator());
+	}
+
+	@AfterAll
+	static void closeValidatorFactory() {
+		VALIDATOR_FACTORY.close();
+	}
+
+	@Test
+	void createsTicketWithOpenStatusAndApprovedFields() {
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		TicketResponse response = ticketService.createTicket(
+				new CreateTicketRequest("Login issue", "Cannot sign in", Priority.HIGH, "Support"));
+
+		verify(ticketRepository).saveAndFlush(any(Ticket.class));
+		assertEquals(TicketStatus.OPEN, response.status());
+		assertEquals("Login issue", response.title());
+		assertEquals("Cannot sign in", response.description());
+		assertEquals(Priority.HIGH, response.priority());
+		assertEquals("Support", response.assignee());
+	}
+
+	@Test
+	void rejectsInvalidCreateRequestBeforeSaving() {
+		assertThrows(ConstraintViolationException.class, () -> ticketService.createTicket(
+				new CreateTicketRequest("", "A description", null, null)));
+
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	@Test
+	void getsTicketByIdOrThrowsWhenMissing() {
+		Ticket ticket = ticketWithStatus(TicketStatus.OPEN);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+
+		assertEquals(TicketStatus.OPEN, ticketService.getTicketById(TICKET_ID).status());
+
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
+		assertThrows(TicketNotFoundException.class, () -> ticketService.getTicketById(TICKET_ID));
+	}
+
+	@Test
+	void delegatesKeywordAndStatusFiltersToRepository() {
+		when(ticketRepository.findByFilters(" \t ", TicketStatus.OPEN)).thenReturn(java.util.List.of());
+
+		assertEquals(java.util.List.of(), ticketService.listTickets(" \t ", TicketStatus.OPEN));
+
+		verify(ticketRepository).findByFilters(" \t ", TicketStatus.OPEN);
+	}
+
+	@Test
+	void updatesOnlyEditableTicketFields() {
+		Ticket ticket = ticketWithStatus(TicketStatus.IN_PROGRESS);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		TicketResponse response = ticketService.updateTicket(TICKET_ID,
+				new UpdateTicketRequest("Updated title", "Updated description", Priority.CRITICAL, null));
+
+		assertEquals("Updated title", ticket.getTitle());
+		assertEquals("Updated description", ticket.getDescription());
+		assertEquals(Priority.CRITICAL, ticket.getPriority());
+		assertNull(ticket.getAssignee());
+		assertEquals(TicketStatus.IN_PROGRESS, ticket.getStatus());
+		assertEquals(TicketStatus.IN_PROGRESS, response.status());
+		verify(ticketRepository).saveAndFlush(ticket);
+	}
+
+	@Test
+	void updateOfMissingTicketThrowsNotFoundWithoutSaving() {
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
+
+		assertThrows(TicketNotFoundException.class, () -> ticketService.updateTicket(TICKET_ID,
+				new UpdateTicketRequest("Title", "Description", Priority.LOW, null)));
+
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	@ParameterizedTest
+	@MethodSource("validTransitions")
+	void appliesEveryAllowedStatusTransition(TicketStatus currentStatus, TicketStatus requestedStatus) {
+		Ticket ticket = ticketWithStatus(currentStatus);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		assertEquals(requestedStatus, ticketService.changeTicketStatus(TICKET_ID, requestedStatus).status());
+		verify(ticketRepository).saveAndFlush(ticket);
+	}
+
+	@ParameterizedTest
+	@MethodSource("invalidTransitions")
+	void rejectsEveryOtherTransitionWithoutChangingOrSaving(TicketStatus currentStatus,
+			TicketStatus requestedStatus) {
+		Ticket ticket = ticketWithStatus(currentStatus);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+
+		InvalidStatusTransitionException exception = assertThrows(InvalidStatusTransitionException.class,
+				() -> ticketService.changeTicketStatus(TICKET_ID, requestedStatus));
+
+		assertEquals(currentStatus, ticket.getStatus());
+		assertEquals("Ticket cannot transition from " + currentStatus + " to " + requestedStatus,
+				exception.getMessage());
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	private static Stream<Arguments> validTransitions() {
+		return Stream.of(
+				Arguments.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS),
+				Arguments.of(TicketStatus.OPEN, TicketStatus.CANCELLED),
+				Arguments.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED),
+				Arguments.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+				Arguments.of(TicketStatus.RESOLVED, TicketStatus.CLOSED));
+	}
+
+	private static Stream<Arguments> invalidTransitions() {
+		return Arrays.stream(TicketStatus.values())
+				.flatMap(currentStatus -> Arrays.stream(TicketStatus.values())
+						.filter(requestedStatus -> !VALID_TRANSITIONS.get(currentStatus).contains(requestedStatus))
+						.map(requestedStatus -> Arguments.of(currentStatus, requestedStatus)));
+	}
+
+	private Ticket ticketWithStatus(TicketStatus status) {
+		Ticket ticket = new Ticket("Original title", "Original description", Priority.MEDIUM, "Original assignee");
+		ticket.setStatus(status);
+		return ticket;
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Compile final production and test sources after cleanup.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step12-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step12-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step12-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step12-classes $(find src/main/java -name '*.java') && java
+c --release 21 -cp "/tmp/c2jir-ticket-step12-classes:$dependency_classpath" -d /
+tmp/c2jir-ticket-step12-test-classes $(find src/test/java -name '*.java')
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short`
+
+Confirm final files changed for the Ticket service step and verify specification files remain untouched.
+
+```bash
+git status --short
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `TicketService.java`, `InvalidStatusTransitionException.java`, `TicketServiceTest.java`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Implemented the Ticket service and focused tests.
+
+Changed files:
+- `src/main/java/com/supportticket/service/TicketService.java`
+- `src/main/java/com/supportticket/exception/InvalidStatusTransitionException.java`
+- `src/test/java/com/supportticket/service/TicketServiceTest.java`
+
+The service uses an explicit transition map for the five allowed transitions. It checks the persisted status before changing the entity; invalid and same-state requests throw an exception naming both statuses, without modifying or saving the ticket. Create and update validate their DTOs, and update only changes editable fields. Mutations flush before response mapping so generated IDs and timestamps are available.
+
+**Verification:** `mvn test` could not run because Maven is unavailable and there is no wrapper. Production and test sources compiled with Java 21; all 31 focused test invocations passed, and an in-memory H2 check verified service wiring, generated values, updates, retrieval, and rejection behavior.
+
+**Assumption and issue:** Comments remain omitted from ticket responses until the later comment task. An initial H2 check found timestamps were null when mapping before flush; I corrected this with `saveAndFlush` and verified generated values afterward. No specifications were modified.
+
+---
+
+_**User (2026-09-27 12:15:50Z)**_
+
+We are implementing STEP 13 from plan/implementation-plan.md.
+
+Before making changes, read:
+- spec/api-contract.md
+- spec/requirements.md
+- spec/state-machine.md
+- spec/architecture.md
+- plan/implementation-plan.md
+- rules/api-standards.md
+
+Implement ONLY the REST controllers for the Ticket APIs.
+
+Create the ticket controller with these endpoints:
+
+1. POST /api/tickets
+   - Create ticket
+   - Request: create-ticket DTO
+   - Success: HTTP 201 CREATED
+   - Return ticket response DTO
+
+2. GET /api/tickets
+   - Optional query parameters:
+     keyword
+     status
+   - Support keyword only, status only, or both
+   - Return list of ticket response DTOs
+
+3. GET /api/tickets/{id}
+   - Return ticket details
+   - Include comments according to the API contract
+   - Return 404 when the ticket does not exist
+
+4. PUT /api/tickets/{id}
+   - Update title, description, priority and assignee
+   - Status must NOT be accepted/changed here
+   - Return updated ticket
+   - Return 400 for validation errors
+   - Return 404 when ticket does not exist
+
+5. PATCH /api/tickets/{id}/status
+   - Request:
+     {
+       "status": "IN_PROGRESS"
+     }
+   - Delegate status validation entirely to the service
+   - Return the updated ticket on success
+   - Invalid transition must become HTTP 409 with:
+     code = INVALID_STATUS_TRANSITION
+   - Do not duplicate the state-machine logic in the controller.
+
+Controller rules:
+- Controllers handle HTTP concerns only.
+- Use request/response DTOs.
+- Do not expose JPA entities.
+- Use constructor injection.
+- Delegate business logic to the service.
+- Do not put repository calls in controllers.
+- Do not duplicate validation/business rules already owned by the service.
+- Follow the error handling already implemented with @RestControllerAdvice.
+
+Do not implement:
+- comment endpoints
+- frontend
+- authentication
+- pagination
+- unrelated APIs.
+
+After implementation:
+1. Run the project's build/tests.
+2. Verify the Spring application context starts.
+3. Report all files changed.
+4. Report any assumptions or issues.
+5. Do not modify specification files.
+
+---
+
+_**Agent (copilot/auto)**_
+
+<think><details><summary>Thought Process</summary>
+The controller can stay thin, but the existing detail service currently serializes `comments` as omitted. To meet the explicit detail-response contract without a repository call in the controller or a comment endpoint, I’ll make the service’s single-ticket mapping include the already-associated comments, then add only the five requested routes.
+</details></think>
+
+_**Agent (copilot/auto)**_
+
+I’ll reread the six requested contract/rule files, then inspect the existing service and advice signatures so the controller remains thin. I’ll also verify how the service currently represents detail comments; if needed, I’ll make only the minimal service-side mapping required to return the contract’s comment array without adding comment endpoints.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `implementation-plan.md`
+
+**Input:**
+
+- endLine: `360`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/plan/implementation-plan.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Implementation Plan
+
+This plan follows the finalized specifications and repository rules. Implement only the required behavior; do not add authentication, Kafka, Redis, notifications, dashboards, pagination, Docker, microservices, cloud infrastructure, or other out-of-scope features. In particular, the backend state machine is authoritative: frontend transition controls are guidance and must not replace backend enforcement.
+
+Paths such as `<backend-root>` and `<frontend-root>` are placeholders for the chosen project layout. Create only files needed for the listed responsibilities.
+
+## Sequential Tasks
+
+### Task 01: Project and Backend Foundation
+
+- **Purpose:** Confirm the approved specifications as the implementation baseline; establish the minimal Java 21/Spring Boot backend application and build configuration.
+- **Files/packages likely to be created or changed:** `<backend-root>/` build and application configuration files; application bootstrap under the chosen root package.
+- **Dependencies/prerequisites:** All specification and guidance documents approved; none of the application layers exists yet.
+- **Validation/test expected:** Backend builds and starts with its test profile; verify Java 21 and Spring Boot configuration. No business behavior is added here.
+
+### Task 02: Domain Enums and Entities
+
+- **Purpose:** Define the ticket and comment domain/persistence shapes and approved value sets.
+- **Files/packages likely to be created or changed:** `<application-root>/entity/Ticket`, `Comment`; `<application-root>/entity/TicketStatus`, `Priority` (or equivalent domain package).
+- **Dependencies/prerequisites:** Task 01.
+- **Validation/test expected:** Compile and add focused model checks if the chosen persistence mapping requires them; confirm all enum values and fields match `spec/data-model.md`.
+
+### Task 03: Repository and Persistence
+
+- **Purpose:** Persist and retrieve tickets and comments using file-based H2 for local devel
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `api-contract.md`
+
+**Input:**
+
+- endLine: `360`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/api-contract.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System API Contract
+
+This document defines the JSON REST contract for the required ticket and comment operations. Ticket and comment fields follow [data-model.md](data-model.md); ticket statuses and allowed transitions follow [state-machine.md](state-machine.md). Persistence entities are not exposed directly; the JSON resources below are API representations.
+
+Ticket IDs and comment IDs are server-generated UUIDs. The server generates `createdAt` and `updatedAt`; clients must not provide or modify IDs or timestamps. Timestamp values are read-only ISO-8601 strings in UTC, for example `2026-09-27T10:30:00Z`. In the examples below, `<server-generated timestamp>` stands in for a value in this format. New tickets start with status `OPEN`. No authentication, deletion, or pagination endpoints are included.
+
+## Common Error Response
+
+Errors use the consistent JSON structure defined in [requirements.md](requirements.md). Validation errors also contain field-level `errors`.
+
+Validation error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "Request validation failed",
+  "errors": {
+    "title": "Title is required"
+  },
+  "path": "/api/tickets"
+}
+```
+
+Not-found error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 404,
+  "code": "NOT_FOUND",
+  "message": "Ticket not found",
+  "path": "/api/tickets/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## Create Ticket
+
+- **Method:** `POST`
+- **Path:** `/api/tickets`
+- **Query parameters:** None
+- **Request JSON:** `title`, `description`, and `priority` are required. `assignee` is optional. Do not send `id`, `status`, `createdAt`, or `updatedAt`; the server generates the ID and timestamps and assigns `OPEN` status.
+
+```json
+{
+  "title": "Cannot access account",
+  "description": "The sign-in page returns an error.",
+  "priority": "HIGH",
+  "assignee": "Support Team"
+}
+```
+
+- **Success:** `201 CREATED`
+- *
+… (output truncated)
+````
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `requirements.md`
+
+**Input:**
+
+- endLine: `290`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/requirements.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Requirements
+
+## Scope
+
+The system provides a user interface and REST API for creating, finding, viewing, and maintaining support tickets. Ticket data must be stored in a database and remain available after an application restart. The system must enforce the specified ticket status workflow on the backend.
+
+Technology constraints are Java 21, Spring Boot, PostgreSQL or H2, a REST API, and React/Next.js or an equivalent frontend. Use file-based H2 for local development so persisted data survives an application restart. Other environments may use PostgreSQL or H2. Except for the status-transition route defined below, these constraints do not prescribe endpoint shapes or screen layout.
+
+## Functional Requirements
+
+1. A user can create a ticket from the UI.
+2. A user can list tickets.
+3. A user can view the details of a ticket.
+4. A user can update a ticket's title, description, priority, and assignee. Assignee is an optional String field.
+5. A user can add comments to a ticket. Each comment contains `id`, `ticketId`, `author`, `content`, and `createdAt`. The server generates the comment `id` as a UUID and generates `createdAt`; the client supplies `author` as a String.
+6. A user can search tickets by keyword in the title and description using case-insensitive substring matching. A blank or whitespace-only keyword applies no search filter. Search can be combined with status filtering.
+7. A user can filter tickets by status.
+8. The system persists ticket data in a database so that it survives application restart.
+9. The backend validates input according to the validation requirements below.
+10. A client requests a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target `status`. The backend accepts only valid transitions and rejects invalid transitions, as defined in [state-machine.md](state-machine.md).
+11. The UI displays meaningful errors when an operation fails.
+
+## Non-Functional Requirements
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `state-machine.md`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/state-machine.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Ticket State Machine
+
+This document defines the allowed ticket status transitions. The backend is authoritative and must reject transitions not listed as valid.
+
+New tickets always start in `OPEN`.
+
+## States
+
+- `OPEN`
+- `IN_PROGRESS`
+- `RESOLVED`
+- `CLOSED`
+- `CANCELLED`
+
+## Valid Transitions
+
+| Current state | Requested state | Result |
+| --- | --- | --- |
+| `OPEN` | `IN_PROGRESS` | Allowed |
+| `OPEN` | `CANCELLED` | Allowed |
+| `IN_PROGRESS` | `RESOLVED` | Allowed |
+| `IN_PROGRESS` | `CANCELLED` | Allowed |
+| `RESOLVED` | `CLOSED` | Allowed |
+
+## Invalid Transitions
+
+Any transition not listed in the valid-transition table is invalid, including same-state requests. `CLOSED` and `CANCELLED` are terminal states and have no outgoing transitions. Examples include:
+
+| Current state | Requested state | Result |
+| --- | --- | --- |
+| `CLOSED` | `OPEN` | Rejected |
+| `CLOSED` | `IN_PROGRESS` | Rejected |
+| `RESOLVED` | `OPEN` | Rejected |
+| `RESOLVED` | `CANCELLED` | Rejected |
+| `CANCELLED` | `OPEN` | Rejected |
+| `CANCELLED` | `IN_PROGRESS` | Rejected |
+| Any state | Same state | Rejected |
+
+## Transition Rules
+
+- A ticket may move only along a valid transition listed above.
+- Every new ticket starts in `OPEN`.
+- The backend must validate each requested transition; frontend restrictions do not replace backend validation.
+- Request a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target status, for example `{ "status": "IN_PROGRESS" }`.
+- A rejected transition must not change the ticket's current state.
+- Valid transitions have no additional business preconditions or required side effects.
+
+## Expected Backend Behavior for Invalid Transitions
+
+- Reject the requested transition and leave the ticket in its current state.
+- Return HTTP `409 CONFLICT`.
+- Return the error using the project's standard API error format.
+- Do not expose internal exception details.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `architecture.md`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/architecture.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System Architecture
+
+## High-Level Architecture
+
+The application is a single frontend backed by a single Spring Boot REST service and a relational database:
+
+```text
+React/Vite frontend  <---- JSON over HTTP ---->  Spring Boot REST backend  <---->  File-based H2
+```
+
+- **Frontend:** React with Vite. Provides ticket creation, listing, details, updates, comments, keyword search, status filtering, status changes, and user-visible error messages.
+- **Backend:** Java 21 and Spring Boot. Exposes the REST API, validates incoming data, applies ticket business rules, enforces the state machine, and translates expected failures to the standard JSON error format.
+- **Persistence:** File-based H2 for local development. Ticket and comment data must remain available after an application restart.
+
+Keep this as a simple layered application. The frontend communicates with the backend through HTTP and does not access the database directly.
+
+## Backend Package Structure
+
+Use packages within the application's existing root package. A suitable minimal structure is:
+
+```text
+<application-root>/
+  controller/   HTTP endpoints and request/response binding
+  service/      use cases, business rules, and state-transition validation
+  repository/   persistence access
+  entity/       persisted ticket and comment models
+  dto/          API request and response models
+  exception/    application errors and centralized HTTP error translation
+  config/       only required application configuration
+  mapper/       only if explicit mapping logic warrants a separate package
+```
+
+Controllers should handle HTTP concerns and delegate use cases to services. Services own business decisions and coordinate repositories. Repositories perform persistence operations. DTOs define API boundaries; persistence entities are not exposed directly as API responses. Use constructor injection between layers.
+
+Keep `config` and `mapper` only when there is actual configuration or mapping to main
+… (output truncated)
+````
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `api-standards.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/api-standards.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# API Standards
+
+Treat approved specifications as the source of truth for API behavior. Record contract decisions there before implementation when a convention is not yet specified.
+
+## REST and Naming
+
+- Model endpoints as resource-oriented paths, using consistent plural nouns for collections and stable identifiers for individual resources. Avoid verbs in paths unless an explicitly modeled action cannot be represented clearly as a resource operation.
+- Use consistent casing and nesting. Keep nesting shallow and do not expose database table names or internal implementation details.
+- Use JSON consistently for request and response bodies unless the contract requires another media type. Represent dates and times in a documented, unambiguous format.
+
+## HTTP Methods and Status Codes
+
+- Use `GET` to read, `POST` to create or invoke a documented non-idempotent operation, `PUT` to replace, `PATCH` to partially update, and `DELETE` to remove a resource.
+- Preserve HTTP method safety and idempotency semantics. Document concurrency behavior and repeat-request behavior where relevant.
+- Use status codes consistently: `200` for a successful response with a body, `201` for resource creation, `204` for success without a body, `400` for malformed or invalid requests, `401` for missing or invalid authentication, `403` for insufficient permission, `404` for unavailable resources, and `409` for conflicts with current state. Use other codes only when the contract defines their meaning.
+
+## Validation and Errors
+
+- Validate request shape and values at the API boundary, and return client errors in the documented format. Do not rely on clients to enforce server-side rules.
+- Use one consistent error-response structure across endpoints. Include a stable machine-readable error identifier and safe message; include field-level details when useful and specified. Do not expose stack traces, SQL, internal class names, secrets, or sensitive data.
+- Map expected validation, authorization, not-fo
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The API contract confirms the five required ticket routes, enum query binding, DTO-only bodies, and comments on the detail response. The current TicketService is the right place for detail-comment mapping; I’m inspecting its response mapping and the advice/controller package before making the minimal controller addition.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short`
+
+Identify pre-existing worktree changes before adding the controller.
+
+```bash
+git status --short
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
+
+Read `controller`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller`
+
+**Result:**
+
+```
+package-info.java
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketService.java`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class TicketService {
+
+	private static final Map<TicketStatus, Set<TicketStatus>> ALLOWED_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public TicketService(TicketRepository ticketRepository, Validator validator) {
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public TicketResponse createTicket(CreateTicketRequest request) {
+		validate(request);
+		Ticket ticket = new Ticket(request.title(), request.description(), request.priority(), request.assignee());
+		ticket.setStatus(TicketStatus.OPEN);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional(readOnly = true)
+	public TicketResponse getTicketById(UUID ticketId) {
+		return ticketRepository.findById(ticketId)
+				.map(this::toResponse)
+				.orElseThrow(TicketNotFoundException::new);
+	}
+
+	@Transactional(readOnly = true)
+	public List<TicketRespon
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `ChangeTicketStatusRequest.java`
+
+**Input:**
+
+- endLine: `120`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/ChangeTicketStatusRequest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import com.supportticket.entity.TicketStatus;
+
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotNull;
+
+public record ChangeTicketStatusRequest(
+		@NotNull(message = "Status is required")
+		TicketStatus status) {
+
+	@JsonAnySetter
+	public void rejectUnknownProperty(String name, JsonNode value) {
+		throw new IllegalArgumentException("Unrecognized request field");
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CreateTicketRequest.java`
+
+**Input:**
+
+- endLine: `160`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/CreateTicketRequest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import com.supportticket.entity.Priority;
+
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record CreateTicketRequest(
+		@NotBlank(message = "Title is required")
+		@Size(min = 1, max = 200, message = "Title must contain 1-200 characters")
+		String title,
+		@NotBlank(message = "Description is required")
+		@Size(min = 1, max = 2000, message = "Description must contain 1-2000 characters")
+		String description,
+		@NotNull(message = "Priority is required")
+		Priority priority,
+		String assignee) {
+
+	@JsonAnySetter
+	public void rejectUnknownProperty(String name, JsonNode value) {
+		throw new IllegalArgumentException("Unrecognized request field");
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `UpdateTicketRequest.java`
+
+**Input:**
+
+- endLine: `160`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/UpdateTicketRequest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import com.supportticket.entity.Priority;
+
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record UpdateTicketRequest(
+		@NotBlank(message = "Title is required")
+		@Size(min = 1, max = 200, message = "Title must contain 1-200 characters")
+		String title,
+		@NotBlank(message = "Description is required")
+		@Size(min = 1, max = 2000, message = "Description must contain 1-2000 characters")
+		String description,
+		@NotNull(message = "Priority is required")
+		Priority priority,
+		String assignee) {
+
+	@JsonAnySetter
+	public void rejectUnknownProperty(String name, JsonNode value) {
+		throw new IllegalArgumentException("Unrecognized request field");
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketResponse.java`
+
+**Input:**
+
+- endLine: `160`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/TicketResponse.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.TicketStatus;
+
+public record TicketResponse(
+		UUID id,
+		String title,
+		String description,
+		Priority priority,
+		TicketStatus status,
+		String assignee,
+		Instant createdAt,
+		Instant updatedAt,
+		@JsonInclude(JsonInclude.Include.NON_NULL) List<CommentResponse> comments) {
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CommentResponse.java`
+
+**Input:**
+
+- endLine: `120`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/CommentResponse.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import java.time.Instant;
+import java.util.UUID;
+
+public record CommentResponse(
+		UUID id,
+		UUID ticketId,
+		String author,
+		String content,
+		Instant createdAt) {
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `ApiExceptionHandler.java`
+
+**Input:**
+
+- endLine: `260`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/ApiExceptionHandler.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.exception;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.supportticket.dto.ApiErrorResponse;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.servlet.http.HttpServletRequest;
+
+@RestControllerAdvice
+public class ApiExceptionHandler {
+
+	private static final Logger logger = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+	@ExceptionHandler(BindException.class)
+	public ResponseEntity<ApiErrorResponse> handleValidation(BindException exception,
+			HttpServletRequest request) {
+		Map<String, String> errors = new TreeMap<>();
+		exception.getBindingResult().getFieldErrors().forEach(error ->
+				errors.putIfAbsent(error.getField(), error.getDefaultMessage()));
+		exception.getBindingResult().getGlobalErrors().forEach(error ->
+				errors.putIfAbsent("request", error.getDefaultMessage()));
+		return errorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed",
+				errors, request);
+	}
+
+	@ExceptionHandler(ConstraintViolationException.class)
+	public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException exception,
+			HttpServletRequest request) {
+		Map<String, String> errors = new TreeMap<>();
+		exception.getConstraintViolations().forEach(violation -> {
+			String propertyPath = violation.getPropertyPath().toString();
+			String field = propertyPath.substring(p
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The controller can stay thin, but the existing detail service currently serializes  as omitted. To meet the explicit detail-response contract without a repository call in the controller or a comment endpoint, I’ll make the service’s single-ticket mapping include the already-associated comments, then add only the five requested routes.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketController.java**</summary>
+
+@@ lines 1-1 @@
+
+```
+package com.supportticket.controller;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.service.TicketService;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/tickets")
+public class TicketController {
+
+	private final TicketService ticketService;
+
+	public TicketController(TicketService ticketService) {
+		this.ticketService = ticketService;
+	}
+
+	@PostMapping
+	public ResponseEntity<TicketResponse> createTicket(@Valid @RequestBody CreateTicketRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.createTicket(request));
+	}
+
+	@GetMapping
+	public List<TicketResponse> listTickets(
+			@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "status", required = false) TicketStatus status) {
+		return ticketService.listTickets(keyword, status);
+	}
+
+	@GetMapping("/{id}")
+	public TicketResponse getTicketById(@PathVariable UUID id) {
+		return ticketService.getTicketById(id);
+	}
+
+	@PutMapping("/{id}")
+	public TicketResponse updateTicket(@PathVariable UUID id, @Valid @RequestBody UpdateTicketRequest request) {
+		return ticketService.updateTicket(id, request);
+	}
+
+	@PatchMapping("/{id}/status")
+	public TicketResponse changeTicketStatus(@PathVariable UUID id,
+			@Valid @RequestBody ChangeTicketStatusRequest request) {
+		return ticketService.changeTicketStatus(id, request.status());
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketService.java**</summary>
+
+@@ lines 1-133 @@
+
+```
+package com.supportticket.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Comment;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class TicketService {
+
+	private static final Map<TicketStatus, Set<TicketStatus>> ALLOWED_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public TicketService(TicketRepository ticketRepository, Validator validator) {
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public TicketResponse createTicket(CreateTicketRequest request) {
+		validate(request);
+		Ticket ticket = new Ticket(request.title(), request.description(), request.priority(), request.assignee());
+		ticket.setStatus(TicketStatus.OPEN);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional(readOnly = true)
+	public TicketResponse getTicketById(UUID ticketId) {
+		return ticketRepository.findById(ticketId)
+				.map(this::toDetailResponse)
+				.orElseThrow(TicketNotFoundException::new);
+	}
+
+	@Transactional(readOnly = true)
+	public List<TicketResponse> listTickets(String keyword, TicketStatus status) {
+		return ticketRepository.findByFilters(keyword, status).stream()
+				.map(this::toResponse)
+				.toList();
+	}
+
+	@Transactional
+	public TicketResponse updateTicket(UUID ticketId, UpdateTicketRequest request) {
+		validate(request);
+		Ticket ticket = findTicket(ticketId);
+		ticket.setTitle(request.title());
+		ticket.setDescription(request.description());
+		ticket.setPriority(request.priority());
+		ticket.setAssignee(request.assignee());
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional
+	public TicketResponse changeTicketStatus(UUID ticketId, TicketStatus requestedStatus) {
+		Ticket ticket = findTicket(ticketId);
+		TicketStatus currentStatus = ticket.getStatus();
+		Set<TicketStatus> allowedStatuses = ALLOWED_TRANSITIONS.get(currentStatus);
+		if (requestedStatus == null || allowedStatuses == null || !allowedStatuses.contains(requestedStatus)) {
+			throw new InvalidStatusTransitionException(currentStatus, requestedStatus);
+		}
+
+		ticket.setStatus(requestedStatus);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	private Ticket findTicket(UUID ticketId) {
+		return ticketRepository.findById(ticketId).orElseThrow(TicketNotFoundException::new);
+	}
+
+	private <T> void validate(T request) {
+		var violations = validator.validate(request);
+		if (!violations.isEmpty()) {
+			throw new ConstraintViolationException(violations);
+		}
+	}
+
+	private TicketResponse toResponse(Ticket ticket) {
+		return toResponse(ticket, null);
+	}
+
+	private TicketResponse toDetailResponse(Ticket ticket) {
+		List<CommentResponse> comments = ticket.getComments().stream()
+				.map(this::toCommentResponse)
+				.toList();
+		return toResponse(ticket, comments);
+	}
+
+	private CommentResponse toCommentResponse(Comment comment) {
+		return new CommentResponse(
+				comment.getId(),
+				comment.getTicket().getId(),
+				comment.getAuthor(),
+				comment.getContent(),
+				comment.getCreatedAt());
+	}
+
+	private TicketResponse toResponse(Ticket ticket, List<CommentResponse> comments) {
+		return new TicketResponse(
+				ticket.getId(),
+				ticket.getTitle(),
+				ticket.getDescription(),
+				ticket.getPriority(),
+				ticket.getStatus(),
+				ticket.getAssignee(),
+				ticket.getCreatedAt(),
+				ticket.getUpdatedAt(),
+				comments);
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The controller now exposes only the five specified ticket routes, with validation annotations and service delegation. Detail retrieval includes comment DTOs from the service’s loaded relationship; I’m attempting the project test command as the first validation action.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` mvn test`
+
+Run the project tests and build after adding the Ticket REST controller.
+
+```bash
+mvn test
+```
+
+**Result:**
+
+```
+Command 'mvn' not found, but can be installed with:
+sudo apt install maven
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Maven is still unavailable, so the requested `mvn test` cannot run. I’m compiling production and test sources with Java 21 and checking editor diagnostics first; after that I’ll start the actual web application on an isolated in-memory H2 database and smoke-test the routes.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` mkdir -p /tmp/c2jir-ticket-step13-classes /tmp/c2jir-ticket-step13-test-clas...`
+
+Compile all current production and test sources using Java 21 and cached Maven dependencies.
+
+```bash
+mkdir -p /tmp/c2jir-ticket-step13-classes /tmp/c2jir-ticket-step13-test-classes && dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step13-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step13-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step13-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+
+
+Command produced no output
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `TicketController.java`, `TicketService.java`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller/TicketController.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller/TicketController.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Both production and test sources compile, and editor diagnostics are clean. I’m starting the Spring web application with an in-memory H2 override so startup and endpoint checks won’t touch the file-backed development database.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Start the complete Spring web application on an isolated H2 database to verify context initialization and HTTP endpoint mappings.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step13-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18081 '--spring.datasource.url=jdbc:h2:mem:step13-web;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+```
+
+**Result:**
+
+```
+Command is running in terminal with ID=1c836fd8-6261-41a6-a908-8a124c5f493a
+ The command became idle with output:
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step13-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18081 '--spring.datasource.url=jdbc:h2:mem:step13-web;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2026-09-27T17:48:04.682+05:30  INFO 12927 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : Starting SupportTicketApplication using Java 21.0.2 with PID 12927 (/tmp/c2jir-ticket-step13-classes started by sandeep in /home/sandeep/Desktop/c2_project/c2JiraTicket)
+2026-09-27T17:48:04.688+05:30  INFO 12927 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : No active profile set, falling back to 1 default profile: "default"
+2026-09-27T17:48:06.327+05:30  INFO 12927 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-27T17:48:06.438+05:30  INFO 12927 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 84 ms. Found 2 JPA repository interfaces.
+2026-09-27T17:48:07.461+05:30  INFO 12927 --- [support-ticket-management] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 18081 (http)
+2026-09-27T17:48:07.488+05:30  INFO 12
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The full Spring web context is up on port 18081 with in-memory H2; both repositories, the ticket service, and Tomcat initialized successfully. I’m now exercising create/list/detail/update/status routes over HTTP, including validation and invalid-transition error responses, before stopping the test server.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` base\_url=http://localhost:18081/api/tickets && create\_response=$\(curl -sS -w...`
+
+Exercise all five HTTP routes plus DTO validation, server-owned update fields, not-found handling, and service-owned status conflicts.
+
+```bash
+base_url=http://localhost:18081/api/tickets && create_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"title":"Login failure","description":"Cannot sign in","priority":"HIGH"}' "$base_url") && create_body=${create_response%$'\n'*} && create_status=${create_response##*$'\n'} && ticket_id=$(printf '%s' "$create_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p') && [[ "$create_status" == "201" && -n "$ticket_id" && "$create_body" == *'"status":"OPEN"'* ]] && list_response=$(curl -sS -w '\n%{http_code}' "$base_url?keyword=login&status=OPEN") && list_status=${list_response##*$'\n'} && [[ "$list_status" == "200" && "$list_response" == *"$ticket_id"* ]] && detail_response=$(curl -sS -w '\n%{http_code}' "$base_url/$ticket_id") && detail_status=${detail_response##*$'\n'} && [[ "$detail_status" == "200" && "$detail_response" == *'"comments":[]'* ]] && update_response=$(curl -sS -w '\n%{http_code}' -X PUT -H 'Content-Type: application/json' -d '{"title":"Changed login","description":"Updated details","priority":"CRITICAL","assignee":"Support"}' "$base_url/$ticket_id") && update_body=${update_response%$'\n'*} && update_status=${update_response##*$'\n'} && [[ "$update_status" == "200" && "$update_body" == *'"status":"OPEN"'* && "$update_body" == *'"assignee":"Support"'* ]] && patch_response=$(curl -sS -w '\n%{http_code}' -X PATCH -H 'Content-Type: application/json' -d '{"status":"IN_PROGRESS"}' "$base_url/$ticket_id/status") && patch_status=${patch_response##*$'\n'} && [[ "$patch_status" == "200" && "$patch_response" == *'"status":"IN_PROGRESS"'* ]] && invalid_response=$(curl -sS -w '\n%{http_code}' -X PATCH -H 'Content-Type: application/json' -d '{"status":"OPEN"}' "$base_url/$ticket_id/status") && invalid_body=${invalid_response%$'\n'*} && invalid_status=${invalid_response##*$'\n'} && [[ "$invalid_status" == "409" && "$invalid_body" == *'"code":"INVALID_STATUS_TRANSITION"'* && "$invalid_body" == *'IN_PROGRESS'* && "$invalid_body" == *'OPEN'* ]] && validation_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"title":"","description":"","priority":null}' "$base_url") && validation_body=${validation_response%$'\n'*} && validation_status=${validation_response##*$'\n'} && [[ "$validation_status" == "400" && "$validation_body" == *'"code":"VALIDATION_ERROR"'* ]] && forbidden_response=$(curl -sS -w '\n%{http_code}' -X PUT -H 'Content-Type: application/json' -d '{"title":"Changed login","description":"Updated details","priority":"CRITICAL","status":"CLOSED"}' "$base_url/$ticket_id") && forbidden_status=${forbidden_response##*$'\n'} && [[ "$forbidden_status" == "400" ]] && missing_response=$(curl -sS -w '\n%{http_code}' "$base_url/00000000-0000-0000-0000-000000000001") && missing_status=${missing_response##*$'\n'} && [[ "$missing_status" == "404" ]] && printf 'HTTP smoke checks passed: POST 201, list/detail 200, PUT 200 (status unchanged), PATCH 200/409, validation/forbidden field 400, missing ID 404\n'
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  base_url=http://loc
+alhost:18081/api/tickets && create_response=$(curl -sS -w '\n%{http_code}' -X PO
+ST -H 'Content-Type: application/json' -d '{"title":"Login failure","description
+":"Cannot sign in","priority":"HIGH"}' "$base_url") && create_body=${create_resp
+onse%$'\n'*} && create_status=${create_response##*$'\n'} && ticket_id=$(printf '
+%s' "$create_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p') && [[ "$create_status
+" == "201" && -n "$ticket_id" && "$create_body" == *'"status":"OPEN"'* ]] && lis
+t_response=$(curl -sS -w '\n%{http_code}' "$base_url?keyword=login&status=OPEN")
+ && list_status=${list_response##*$'\n'} && [[ "$list_status" == "200" && "$list
+_response" == *"$ticket_id"* ]] && detail_response=$(curl -sS -w '\n%{http_code}
+' "$base_url/$ticket_id") && detail_status=${detail_response##*$'\n'} && [[ "$de
+tail_status" == "200" && "$detail_response" == *'"comments":[]'* ]] && update_re
+sponse=$(curl -sS -w '\n%{http_code}' -X PUT -H 'Content-Type: application/json'
+ -d '{"title":"Changed login","description":"Updated details","priority":"CRITIC
+AL","assignee":"Support"}' "$base_url/$ticket_id") && update_body=${update_respo
+nse%$'\n'*} && update_status=${update_response##*$'\n'} && [[ "$update_status" =
+= "200" && "$update_body" == *'"status":"OPEN"'* && "$update_body" == *'"assigne
+e":"Support"'* ]] && patch_response=$(curl -sS -w '\n%{http_code}' -X PATCH -H '
+Content-Type: application/json' -d '{"status":"IN_PROGRESS"}' "$base_url/$ticket
+_id/status") && patch_status=${patch_response##*$'\n'} && [[ "$patch_status" ==
+"200" && "$patch_response" == *'"status":"IN_PROGRESS"'* ]] && invalid_response=
+$(curl -sS -w '\n%{http_code}' -X PATCH -H 'Content-Type: application/json' -d '
+{"status":"OPEN"}' "$base_url/$ticket_id/status") && invalid_body=${invalid_resp
+onse%$'\n'*} && invalid_status=${invalid_response##*$'\n'} && [[ "$invalid_statu
+s" == "409" && "$invalid_body" == *'"code":"INVALID_STATU
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The HTTP smoke script did not reach its final success marker, so at least one assertion failed; the server remains available for diagnosis. I’m checking the live response bodies/statuses in smaller steps to locate the mismatch before deciding whether it’s a controller issue or only a shell assertion.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` curl -sS -w '\\nHTTP=%\{http\_code\}\\n' 'http://localhost:18081/api/tickets'`
+
+Inspect the live list endpoint response after the combined smoke script stopped before its success marker.
+
+```bash
+curl -sS -w '\nHTTP=%{http_code}\n' 'http://localhost:18081/api/tickets'
+```
+
+**Result:**
+
+```
+[{"id":"e86998bf-69c7-4f2c-8369-46f7f876cd96","title":"Login failure","descripti
+on":"Cannot sign in","priority":"HIGH","status":"OPEN","assignee":null,"createdA
+t":"2026-09-27T12:18:48.055863Z","updatedAt":"2026-09-27T12:18:48.055947Z"}]
+HTTP=200
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` curl -sS -w '\\nHTTP=%\{http\_code\}\\n' 'http://localhost:18081/api/tickets/e869...`
+
+Check the detail response directly, focusing on comment inclusion and response status.
+
+```bash
+curl -sS -w '\nHTTP=%{http_code}\n' 'http://localhost:18081/api/tickets/e86998bf-69c7-4f2c-8369-46f7f876cd96'
+```
+
+**Result:**
+
+```
+{"timestamp":"2026-09-27T12:20:13.518551070Z","status":500,"code":"INTERNAL_SERV
+ER_ERROR","message":"An unexpected error occurred","path":"/api/tickets/e86998bf
+-69c7-4f2c-8369-46f7f876cd96"}
+HTTP=500
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The full Spring web context is up on port 18081 with in-memory H2; both repositories, the ticket service, and Tomcat initialized successfully. I’m now exercising create/list/detail/update/status routes over HTTP, including validation and invalid-transition error responses, before stopping the test server.
+
+The HTTP smoke script did not reach its final success marker, so at least one assertion failed; the server remains available for diagnosis. I’m checking the live response bodies/statuses in smaller steps to locate the mismatch before deciding whether it’s a controller issue or only a shell assertion.
+
+The failing assertion is the detail route: it returns the generic 500, while list succeeds. I’m inspecting the running app’s server log to identify the mapping problem, then I’ll fix the service/controller slice and rerun the endpoint checks.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_terminal_output"><details>
+<summary>Tool use: **get_terminal_output**</summary>
+
+Checked terminal output
+
+**Input:**
+
+- id: `1c836fd8-6261-41a6-a908-8a124c5f493a`
+
+**Result:**
+
+```
+Output of terminal 1c836fd8-6261-41a6-a908-8a124c5f493a; showing last 7978 of 21025 characters (13047 earlier characters omitted). If you need the omitted earlier output, re-run the command and redirect output to a file, then read that file:
+        at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:493) ~[tomcat-embed-core-10.1.46.jar:10.1.46]
+        at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.46.jar:10.1.46]
+        at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2026-09-27T17:50:13.516+05:30 ERROR 12927 --- [support-ticket-management] [io-18081-exec-6] c.s.exception.ApiExceptionHandler        : Unexpected error processing GET /api/tickets/e86998bf-69c7-4f2c-8369-46f7f876cd96
+
+java.lang.IllegalArgumentException: Name for argument of type [java.util.UUID] not specified, and parameter name information not available via reflection. Ensure that the compiler uses the '-parameters' flag.
+        at org.springframework.web.method.annotation.AbstractNamedValueMethodArgumentResolver.updateNamedValueInfo(AbstractNamedValueMethodArgumentResolver.java:186) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.annotation.AbstractNamedValueMethodArgumentResolver.getNamedValueInfo(AbstractNamedValueMethodArgumentResolver.java:161) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.annotation.AbstractNamedValueMethodArgumentResolver.resolveArgument(AbstractNamedValueMethodArgumentResolver.java:107) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.support.HandlerMethodArgumentResolverComposite.resolveArgument(HandlerMethodArgumentResolverComposite.java:122) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.support.InvocableHandlerMethod.getMethodArgumentValues(InvocableHandlerMethod.java:227) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.support.
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `content.txt`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_RX8M0Yep8YkWEuOUw7SNgy6u__vscode-1790509702632/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+Output of terminal 1c836fd8-6261-41a6-a908-8a124c5f493a; showing last 7978 of 21025 characters (13047 earlier characters omitted). If you need the omitted earlier output, re-run the command and redirect output to a file, then read that file:
+        at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:493) ~[tomcat-embed-core-10.1.46.jar:10.1.46]
+        at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:63) ~[tomcat-embed-core-10.1.46.jar:10.1.46]
+        at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2026-09-27T17:50:13.516+05:30 ERROR 12927 --- [support-ticket-management] [io-18081-exec-6] c.s.exception.ApiExceptionHandler        : Unexpected error processing GET /api/tickets/e86998bf-69c7-4f2c-8369-46f7f876cd96
+
+java.lang.IllegalArgumentException: Name for argument of type [java.util.UUID] not specified, and parameter name information not available via reflection. Ensure that the compiler uses the '-parameters' flag.
+        at org.springframework.web.method.annotation.AbstractNamedValueMethodArgumentResolver.updateNamedValueInfo(AbstractNamedValueMethodArgumentResolver.java:186) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.annotation.AbstractNamedValueMethodArgumentResolver.getNamedValueInfo(AbstractNamedValueMethodArgumentResolver.java:161) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.annotation.AbstractNamedValueMethodArgumentResolver.resolveArgument(AbstractNamedValueMethodArgumentResolver.java:107) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.support.HandlerMethodArgumentResolverComposite.resolveArgument(HandlerMethodArgumentResolverComposite.java:122) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.support.InvocableHandlerMethod.getMethodArgumentValues(InvocableHandlerMethod.java:227) ~[spring-web-6.2.11.jar:6.2.11]
+        at org.springframework.web.method.support.
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The 500 is caused by unnamed `@PathVariable UUID id` parameters: this manual Java compilation does not retain parameter names, so Spring can’t bind them. I’m making the path variable name explicit on both `/{id}` routes, which is also robust regardless of compiler flags.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketController.java**</summary>
+
+@@ lines 1-66 @@
+
+```
+package com.supportticket.controller;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.service.TicketService;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/tickets")
+public class TicketController {
+
+	private final TicketService ticketService;
+
+	public TicketController(TicketService ticketService) {
+		this.ticketService = ticketService;
+	}
+
+	@PostMapping
+	public ResponseEntity<TicketResponse> createTicket(@Valid @RequestBody CreateTicketRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.createTicket(request));
+	}
+
+	@GetMapping
+	public List<TicketResponse> listTickets(
+			@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "status", required = false) TicketStatus status) {
+		return ticketService.listTickets(keyword, status);
+	}
+
+	@GetMapping("/{id}")
+	public TicketResponse getTicketById(@PathVariable("id") UUID id) {
+		return ticketService.getTicketById(id);
+	}
+
+	@PutMapping("/{id}")
+	public TicketResponse updateTicket(@PathVariable("id") UUID id,
+			@Valid @RequestBody UpdateTicketRequest request) {
+		return ticketService.updateTicket(id, request);
+	}
+
+	@PatchMapping("/{id}/status")
+	public TicketResponse changeTicketStatus(@PathVariable("id") UUID id,
+			@Valid @RequestBody ChangeTicketStatusRequest request) {
+		return ticketService.changeTicketStatus(id, request.status());
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Recompile the controller fix and all test sources before restarting the HTTP smoke check.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step13-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step13-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step13-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step13-classes $(find src/main/java -name '*.java') && java
+c --release 21 -cp "/tmp/c2jir-ticket-step13-classes:$dependency_classpath" -d /
+tmp/c2jir-ticket-step13-test-classes $(find src/test/java -name '*.java')
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The explicit path bindings compile successfully. I’m stopping the stale server build and restarting the recompiled application, then I’ll rerun the route checks against the corrected mappings.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="kill_terminal"><details>
+<summary>Tool use: **kill_terminal**</summary>
+
+Killed terminal
+
+**Input:**
+
+- id: `1c836fd8-6261-41a6-a908-8a124c5f493a`
+
+**Result:**
+
+```
+Successfully killed persistent terminal 1c836fd8-6261-41a6-a908-8a124c5f493a. Final output before termination:
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step13-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18081 '--spring.datasource.url=jdbc:h2:mem:step13-web;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2026-09-27T17:48:04.682+05:30  INFO 12927 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : Starting SupportTicketApplication using Java 21.0.2 with PID 12927 (/tmp/c2jir-ticket-step13-classes started by sandeep in /home/sandeep/Desktop/c2_project/c2JiraTicket)
+2026-09-27T17:48:04.688+05:30  INFO 12927 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : No active profile set, falling back to 1 default profile: "default"
+2026-09-27T17:48:06.327+05:30  INFO 12927 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-27T17:48:06.438+05:30  INFO 12927 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 84 ms. Found 2 JPA repository interfaces.
+2026-09-27T17:48:07.461+05:30  INFO 12927 --- [support-ticket-management] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 18081 (http)
+2026-09-27T17:48:07.488+05:30  INFO 12927
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Restart the compiled application with the explicit path-variable mappings and isolated in-memory H2.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step13-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18081 '--spring.datasource.url=jdbc:h2:mem:step13-web-fixed;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+```
+
+**Result:**
+
+```
+Command is running in terminal with ID=cc8bc456-e6fc-490e-9273-f8d01ed38163
+ The command became idle with output:
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step13-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18081 '--spring.datasource.url=jdbc:h2:mem:step13-web-fixed;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2026-09-27T17:51:08.710+05:30  INFO 13637 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : Starting SupportTicketApplication using Java 21.0.2 with PID 13637 (/tmp/c2jir-ticket-step13-classes started by sandeep in /home/sandeep/Desktop/c2_project/c2JiraTicket)
+2026-09-27T17:51:08.716+05:30  INFO 13637 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : No active profile set, falling back to 1 default profile: "default"
+2026-09-27T17:51:09.962+05:30  INFO 13637 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-27T17:51:10.078+05:30  INFO 13637 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 95 ms. Found 2 JPA repository interfaces.
+2026-09-27T17:51:11.138+05:30  INFO 13637 --- [support-ticket-management] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 18081 (http)
+2026-09-27T17:51:11.162+05:30  I
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` base\_url=http://localhost:18081/api/tickets && create\_response=$\(curl -sS -w...`
+
+Re-run full HTTP smoke coverage against the corrected server, including detail, update, status conflict, validation, and not-found behavior.
+
+```bash
+base_url=http://localhost:18081/api/tickets && create_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"title":"Login failure","description":"Cannot sign in","priority":"HIGH"}' "$base_url") && create_body=${create_response%$'\n'*} && create_status=${create_response##*$'\n'} && ticket_id=$(printf '%s' "$create_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p') && [[ "$create_status" == "201" && -n "$ticket_id" && "$create_body" == *'"status":"OPEN"'* ]] && list_response=$(curl -sS -w '\n%{http_code}' "$base_url?keyword=login&status=OPEN") && list_status=${list_response##*$'\n'} && [[ "$list_status" == "200" && "$list_response" == *"$ticket_id"* ]] && detail_response=$(curl -sS -w '\n%{http_code}' "$base_url/$ticket_id") && detail_status=${detail_response##*$'\n'} && [[ "$detail_status" == "200" && "$detail_response" == *'"comments":[]'* ]] && update_response=$(curl -sS -w '\n%{http_code}' -X PUT -H 'Content-Type: application/json' -d '{"title":"Changed login","description":"Updated details","priority":"CRITICAL","assignee":"Support"}' "$base_url/$ticket_id") && update_body=${update_response%$'\n'*} && update_status=${update_response##*$'\n'} && [[ "$update_status" == "200" && "$update_body" == *'"status":"OPEN"'* && "$update_body" == *'"assignee":"Support"'* ]] && patch_response=$(curl -sS -w '\n%{http_code}' -X PATCH -H 'Content-Type: application/json' -d '{"status":"IN_PROGRESS"}' "$base_url/$ticket_id/status") && patch_status=${patch_response##*$'\n'} && [[ "$patch_status" == "200" && "$patch_response" == *'"status":"IN_PROGRESS"'* ]] && invalid_response=$(curl -sS -w '\n%{http_code}' -X PATCH -H 'Content-Type: application/json' -d '{"status":"OPEN"}' "$base_url/$ticket_id/status") && invalid_body=${invalid_response%$'\n'*} && invalid_status=${invalid_response##*$'\n'} && [[ "$invalid_status" == "409" && "$invalid_body" == *'"code":"INVALID_STATUS_TRANSITION"'* && "$invalid_body" == *'IN_PROGRESS'* && "$invalid_body" == *'OPEN'* ]] && validation_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"title":"","description":"","priority":null}' "$base_url") && validation_body=${validation_response%$'\n'*} && validation_status=${validation_response##*$'\n'} && [[ "$validation_status" == "400" && "$validation_body" == *'"code":"VALIDATION_ERROR"'* ]] && forbidden_response=$(curl -sS -w '\n%{http_code}' -X PUT -H 'Content-Type: application/json' -d '{"title":"Changed login","description":"Updated details","priority":"CRITICAL","status":"CLOSED"}' "$base_url/$ticket_id") && forbidden_status=${forbidden_response##*$'\n'} && [[ "$forbidden_status" == "400" ]] && missing_response=$(curl -sS -w '\n%{http_code}' "$base_url/00000000-0000-0000-0000-000000000001") && missing_status=${missing_response##*$'\n'} && [[ "$missing_status" == "404" ]] && printf 'HTTP checks passed: POST 201, GET list/detail 200, PUT 200, PATCH 200/409, validation and forbidden fields 400, missing ticket 404\n'
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  base_url=http://loc
+alhost:18081/api/tickets && create_response=$(curl -sS -w '\n%{http_code}' -X PO
+ST -H 'Content-Type: application/json' -d '{"title":"Login failure","description
+":"Cannot sign in","priority":"HIGH"}' "$base_url") && create_body=${create_resp
+onse%$'\n'*} && create_status=${create_response##*$'\n'} && ticket_id=$(printf '
+%s' "$create_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p') && [[ "$create_status
+" == "201" && -n "$ticket_id" && "$create_body" == *'"status":"OPEN"'* ]] && lis
+t_response=$(curl -sS -w '\n%{http_code}' "$base_url?keyword=login&status=OPEN")
+ && list_status=${list_response##*$'\n'} && [[ "$list_status" == "200" && "$list
+_response" == *"$ticket_id"* ]] && detail_response=$(curl -sS -w '\n%{http_code}
+' "$base_url/$ticket_id") && detail_status=${detail_response##*$'\n'} && [[ "$de
+tail_status" == "200" && "$detail_response" == *'"comments":[]'* ]] && update_re
+sponse=$(curl -sS -w '\n%{http_code}' -X PUT -H 'Content-Type: application/json'
+ -d '{"title":"Changed login","description":"Updated details","priority":"CRITIC
+AL","assignee":"Support"}' "$base_url/$ticket_id") && update_body=${update_respo
+nse%$'\n'*} && update_status=${update_response##*$'\n'} && [[ "$update_status" =
+= "200" && "$update_body" == *'"status":"OPEN"'* && "$update_body" == *'"assigne
+e":"Support"'* ]] && patch_response=$(curl -sS -w '\n%{http_code}' -X PATCH -H '
+Content-Type: application/json' -d '{"status":"IN_PROGRESS"}' "$base_url/$ticket
+_id/status") && patch_status=${patch_response##*$'\n'} && [[ "$patch_status" ==
+"200" && "$patch_response" == *'"status":"IN_PROGRESS"'* ]] && invalid_response=
+$(curl -sS -w '\n%{http_code}' -X PATCH -H 'Content-Type: application/json' -d '
+{"status":"OPEN"}' "$base_url/$ticket_id/status") && invalid_body=${invalid_resp
+onse%$'\n'*} && invalid_status=${invalid_response##*$'\n'} && [[ "$invalid_statu
+s" == "409" && "$invalid_body" == *'"code":"INVALID_STATU
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+All five HTTP routes now pass, including 201 create, detail comments array, unchanged status on PUT, 200/409 PATCH behavior, validation 400, and missing-ticket 404. I’m removing duplicate `@Valid` invocation from create/update because the service already validates those DTOs; I’ll retain DTO validation for the status body’s required target, which the service receives only as an enum.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketController.java**</summary>
+
+@@ lines 1-66 @@
+
+```
+package com.supportticket.controller;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.service.TicketService;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/tickets")
+public class TicketController {
+
+	private final TicketService ticketService;
+
+	public TicketController(TicketService ticketService) {
+		this.ticketService = ticketService;
+	}
+
+	@PostMapping
+	public ResponseEntity<TicketResponse> createTicket(@RequestBody CreateTicketRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.createTicket(request));
+	}
+
+	@GetMapping
+	public List<TicketResponse> listTickets(
+			@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "status", required = false) TicketStatus status) {
+		return ticketService.listTickets(keyword, status);
+	}
+
+	@GetMapping("/{id}")
+	public TicketResponse getTicketById(@PathVariable("id") UUID id) {
+		return ticketService.getTicketById(id);
+	}
+
+	@PutMapping("/{id}")
+	public TicketResponse updateTicket(@PathVariable("id") UUID id,
+			@RequestBody UpdateTicketRequest request) {
+		return ticketService.updateTicket(id, request);
+	}
+
+	@PatchMapping("/{id}/status")
+	public TicketResponse changeTicketStatus(@PathVariable("id") UUID id,
+			@Valid @RequestBody ChangeTicketStatusRequest request) {
+		return ticketService.changeTicketStatus(id, request.status());
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Recompile the final controller after eliminating duplicate DTO validation.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step13-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step13-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step13-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step13-classes $(find src/main/java -name '*.java') && java
+c --release 21 -cp "/tmp/c2jir-ticket-step13-classes:$dependency_classpath" -d /
+tmp/c2jir-ticket-step13-test-classes $(find src/test/java -name '*.java')
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The final controller compiles with validation ownership clarified. I’m restarting the application from these final classes so the final HTTP checks also verify service-owned create/update validation and the explicitly named UUID path variables.
+
+All five HTTP routes now pass, including 201 create, detail comments array, unchanged status on PUT, 200/409 PATCH behavior, validation 400, and missing-ticket 404. I’m removing duplicate `@Valid` invocation from create/update because the service already validates those DTOs; I’ll retain DTO validation for the status body’s required target, which the service receives only as an enum.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketController.java**</summary>
+
+@@ lines 1-66 @@
+
+```
+package com.supportticket.controller;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.service.TicketService;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/tickets")
+public class TicketController {
+
+	private final TicketService ticketService;
+
+	public TicketController(TicketService ticketService) {
+		this.ticketService = ticketService;
+	}
+
+	@PostMapping
+	public ResponseEntity<TicketResponse> createTicket(@RequestBody CreateTicketRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.createTicket(request));
+	}
+
+	@GetMapping
+	public List<TicketResponse> listTickets(
+			@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "status", required = false) TicketStatus status) {
+		return ticketService.listTickets(keyword, status);
+	}
+
+	@GetMapping("/{id}")
+	public TicketResponse getTicketById(@PathVariable("id") UUID id) {
+		return ticketService.getTicketById(id);
+	}
+
+	@PutMapping("/{id}")
+	public TicketResponse updateTicket(@PathVariable("id") UUID id,
+			@RequestBody UpdateTicketRequest request) {
+		return ticketService.updateTicket(id, request);
+	}
+
+	@PatchMapping("/{id}/status")
+	public TicketResponse changeTicketStatus(@PathVariable("id") UUID id,
+			@Valid @RequestBody ChangeTicketStatusRequest request) {
+		return ticketService.changeTicketStatus(id, request.status());
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The final controller compiles with validation ownership clarified. I’m restarting the application from these final classes so the final HTTP checks also verify service-owned create/update validation and the explicitly named UUID path variables.
+
+---
+
+_**User (2026-09-27 12:24:27Z)**_
+
+Implement STEP 14 of the implementation plan: Comment functionality.
+
+Before coding:
+1. Read and follow:
+   - spec/requirements.md
+   - spec/data-model.md
+   - spec/api-contract.md
+   - spec/ui-flow.md
+   - spec/test-strategy.md
+   - plan/implementation-plan.md
+   - rules/java-springboot.md
+   - rules/api-standards.md
+2. Inspect the existing backend implementation and reuse the existing Ticket, Comment, DTO, exception, repository, and service patterns.
+3. Do not redesign existing APIs or introduce unrelated functionality.
+
+Implement only the following:
+
+1. Comment service
+   - Add a service method to add a comment to an existing ticket.
+   - Verify the ticket exists; otherwise throw the existing NOT_FOUND exception.
+   - Create a server-generated UUID for the comment.
+   - createdAt must be server-generated.
+   - author is supplied by the client and is required.
+   - content is supplied by the client and must be 1–1000 characters.
+   - Persist the comment through CommentRepository.
+   - Do not allow comment edit/delete.
+
+2. Comment API
+   Implement:
+   POST /api/tickets/{id}/comments
+
+   Request:
+   {
+     "author": "John",
+     "content": "Investigating the issue"
+   }
+
+   Return the created comment with:
+   - id
+   - ticketId
+   - author
+   - content
+   - createdAt
+
+   Use the existing centralized error handling.
+   Validation failures must return the existing 400 VALIDATION_ERROR structure.
+   Missing ticket must return 404 NOT_FOUND.
+
+3. Ticket details
+   Ensure GET /api/tickets/{id} returns the ticket's comments as defined by the existing API specification.
+   Do not change unrelated ticket behavior.
+
+4. Architecture rules
+   - Controller handles HTTP concerns only.
+   - Service contains business logic.
+   - Repository handles persistence only.
+   - Use DTOs instead of exposing JPA entities directly.
+   - Use constructor injection.
+   - Do not add authentication, authorization, pagination, notifications, or other out-of-scope features.
+
+5. Validation
+   Run the existing build and tests.
+   Add focused tests for:
+   - successful comment creation
+   - comment validation failure
+   - comment creation for non-existent ticket returns 404
+   - createdAt and id are server generated
+   - comments are returned from ticket details
+
+After implementation, report:
+- files changed
+- API implemented
+- validation implemented
+- tests added/run
+- any issue or ambiguity you found
+- whether the implementation matches the specification
+
+Do not implement frontend functionality in this step.
+
+---
+
+_**Agent (copilot/auto)**_
+
+<think><details><summary>Thought Process</summary>
+The existing Comment entity already generates its UUID and `createdAt` during JPA flush; the DTO has the approved author/content constraints, and `GET` detail mapping already serializes associated comments. The missing pieces are a CommentService using both repositories and a delegated `POST /{id}/comments`; I’ll add those plus five focused HTTP integration tests for creation, generation, validation, missing tickets, and detail inclusion.
+
+`CommentService` now validates with the existing DTO constraints, resolves the parent ticket before writing, flushes to obtain the server-generated ID/time, and returns only a `CommentResponse`. The controller delegates `POST /api/tickets/{id}/comments`; the added integration tests use isolated H2 and clear comments before tickets. I’m compiling all sources/tests now.
+</details></think>
+
+_**Agent (copilot/auto)**_
+
+I’m switching to the new STEP 14 request and will leave the ticket endpoints unchanged. I’ll read 
+
+I’m switching to the new STEP 14 request and will leave the ticket endpoints unchanged. I’ll read the eight specified documents first, then inspect the current Comment model/DTO/repository plus ticket detail mapping and existing tests before deciding the smallest comment-service and API change.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `implementation-plan.md`
+
+**Input:**
+
+- endLine: `380`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/plan/implementation-plan.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Implementation Plan
+
+This plan follows the finalized specifications and repository rules. Implement only the required behavior; do not add authentication, Kafka, Redis, notifications, dashboards, pagination, Docker, microservices, cloud infrastructure, or other out-of-scope features. In particular, the backend state machine is authoritative: frontend transition controls are guidance and must not replace backend enforcement.
+
+Paths such as `<backend-root>` and `<frontend-root>` are placeholders for the chosen project layout. Create only files needed for the listed responsibilities.
+
+## Sequential Tasks
+
+### Task 01: Project and Backend Foundation
+
+- **Purpose:** Confirm the approved specifications as the implementation baseline; establish the minimal Java 21/Spring Boot backend application and build configuration.
+- **Files/packages likely to be created or changed:** `<backend-root>/` build and application configuration files; application bootstrap under the chosen root package.
+- **Dependencies/prerequisites:** All specification and guidance documents approved; none of the application layers exists yet.
+- **Validation/test expected:** Backend builds and starts with its test profile; verify Java 21 and Spring Boot configuration. No business behavior is added here.
+
+### Task 02: Domain Enums and Entities
+
+- **Purpose:** Define the ticket and comment domain/persistence shapes and approved value sets.
+- **Files/packages likely to be created or changed:** `<application-root>/entity/Ticket`, `Comment`; `<application-root>/entity/TicketStatus`, `Priority` (or equivalent domain package).
+- **Dependencies/prerequisites:** Task 01.
+- **Validation/test expected:** Compile and add focused model checks if the chosen persistence mapping requires them; confirm all enum values and fields match `spec/data-model.md`.
+
+### Task 03: Repository and Persistence
+
+- **Purpose:** Persist and retrieve tickets and comments using file-based H2 for local devel
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `requirements.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/requirements.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Requirements
+
+## Scope
+
+The system provides a user interface and REST API for creating, finding, viewing, and maintaining support tickets. Ticket data must be stored in a database and remain available after an application restart. The system must enforce the specified ticket status workflow on the backend.
+
+Technology constraints are Java 21, Spring Boot, PostgreSQL or H2, a REST API, and React/Next.js or an equivalent frontend. Use file-based H2 for local development so persisted data survives an application restart. Other environments may use PostgreSQL or H2. Except for the status-transition route defined below, these constraints do not prescribe endpoint shapes or screen layout.
+
+## Functional Requirements
+
+1. A user can create a ticket from the UI.
+2. A user can list tickets.
+3. A user can view the details of a ticket.
+4. A user can update a ticket's title, description, priority, and assignee. Assignee is an optional String field.
+5. A user can add comments to a ticket. Each comment contains `id`, `ticketId`, `author`, `content`, and `createdAt`. The server generates the comment `id` as a UUID and generates `createdAt`; the client supplies `author` as a String.
+6. A user can search tickets by keyword in the title and description using case-insensitive substring matching. A blank or whitespace-only keyword applies no search filter. Search can be combined with status filtering.
+7. A user can filter tickets by status.
+8. The system persists ticket data in a database so that it survives application restart.
+9. The backend validates input according to the validation requirements below.
+10. A client requests a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target `status`. The backend accepts only valid transitions and rejects invalid transitions, as defined in [state-machine.md](state-machine.md).
+11. The UI displays meaningful errors when an operation fails.
+
+## Non-Functional Requirements
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `data-model.md`
+
+**Input:**
+
+- endLine: `270`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/data-model.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Data Model
+
+This document defines the logical persistence/domain model using only decisions established in [requirements.md](requirements.md), [state-machine.md](state-machine.md), and [architecture.md](architecture.md). It does not define Java classes or implementation code.
+
+## Types
+
+| Type | Values |
+| --- | --- |
+| `TicketStatus` | `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELLED` |
+| `Priority` | `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` |
+
+The valid status transitions and initial status are defined in [state-machine.md](state-machine.md). New tickets start in `OPEN`.
+
+## Ticket
+
+| Field | Logical type | Required? | Constraints and ownership |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | Generated by the server. Clients do not provide it. |
+| `title` | String | Yes | 1-200 characters. |
+| `description` | String | Yes | 1-2000 characters. |
+| `priority` | `Priority` | Yes | One of the defined `Priority` values. |
+| `status` | `TicketStatus` | Yes | Server-controlled; new tickets start in `OPEN`, and changes must follow the approved state machine. |
+| `assignee` | String | No | Optional; not a reference to a User entity. |
+| `createdAt` | Timestamp | Yes | Generated by the server when the ticket is created. Clients do not provide it. |
+| `updatedAt` | Timestamp | Yes | Generated and maintained by the server. Clients do not provide it. |
+
+## Comment
+
+| Field | Logical type | Required? | Constraints and ownership |
+| --- | --- | --- | --- |
+| `id` | UUID | Yes | Generated by the server. Clients do not provide it. |
+| `ticketId` | UUID / Ticket relationship | Yes | References exactly one existing Ticket. |
+| `author` | String | Yes | Supplied by the client. No further validation constraint is specified. |
+| `content` | String | Yes | 1-1000 characters. |
+| `createdAt` | Timestamp | Yes | Generated by the server when the comment is created. Clients do not provide it. |
+
+## Relationship
+
+- One Ticket has many Comments.
+- Each Co
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `api-contract.md`
+
+**Input:**
+
+- endLine: `380`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/api-contract.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System API Contract
+
+This document defines the JSON REST contract for the required ticket and comment operations. Ticket and comment fields follow [data-model.md](data-model.md); ticket statuses and allowed transitions follow [state-machine.md](state-machine.md). Persistence entities are not exposed directly; the JSON resources below are API representations.
+
+Ticket IDs and comment IDs are server-generated UUIDs. The server generates `createdAt` and `updatedAt`; clients must not provide or modify IDs or timestamps. Timestamp values are read-only ISO-8601 strings in UTC, for example `2026-09-27T10:30:00Z`. In the examples below, `<server-generated timestamp>` stands in for a value in this format. New tickets start with status `OPEN`. No authentication, deletion, or pagination endpoints are included.
+
+## Common Error Response
+
+Errors use the consistent JSON structure defined in [requirements.md](requirements.md). Validation errors also contain field-level `errors`.
+
+Validation error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "Request validation failed",
+  "errors": {
+    "title": "Title is required"
+  },
+  "path": "/api/tickets"
+}
+```
+
+Not-found error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 404,
+  "code": "NOT_FOUND",
+  "message": "Ticket not found",
+  "path": "/api/tickets/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## Create Ticket
+
+- **Method:** `POST`
+- **Path:** `/api/tickets`
+- **Query parameters:** None
+- **Request JSON:** `title`, `description`, and `priority` are required. `assignee` is optional. Do not send `id`, `status`, `createdAt`, or `updatedAt`; the server generates the ID and timestamps and assigns `OPEN` status.
+
+```json
+{
+  "title": "Cannot access account",
+  "description": "The sign-in page returns an error.",
+  "priority": "HIGH",
+  "assignee": "Support Team"
+}
+```
+
+- **Success:** `201 CREATED`
+- *
+… (output truncated)
+````
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `ui-flow.md`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/ui-flow.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System UI Flow
+
+This document describes a simple user flow based on the finalized [requirements](requirements.md), [state machine](state-machine.md), [architecture](architecture.md), [data model](data-model.md), and [API contract](api-contract.md). It defines behavior, not visual styling or implementation components.
+
+## Ticket List
+
+On entry, load tickets using `GET /api/tickets` and display the returned tickets, including their current status. Show a loading state while the request is in progress, an empty state when there are no matching tickets, and an error state if loading fails.
+
+The list provides:
+
+- A keyword field and a status filter, plus a create-ticket action.
+- Search through `GET /api/tickets?keyword={keyword}&status={status}`. Send either optional query parameter independently or both together. Omit a blank or whitespace-only keyword so it applies no keyword filter. Search is case-insensitive substring matching on title and description.
+- A way to open a ticket's details. Selecting a ticket loads `GET /api/tickets/{id}`.
+
+While a search or filter request is loading, indicate that the results are updating. If it fails, show a meaningful error and retain the available controls so the user can correct the query or retry. Do not add pagination.
+
+## Create Ticket
+
+From the list, the user opens the create-ticket form and enters:
+
+- Title (required, 1-200 characters)
+- Description (required, 1-2000 characters)
+- Priority (required: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`)
+- Assignee (optional String)
+
+On submit, send `POST /api/tickets` with those editable fields. Do not ask for an ID, status, or timestamps; the server generates these and starts the ticket in `OPEN`.
+
+Show a submitting state while waiting. On success, show the created ticket, including its server-assigned ID and `OPEN` status, by opening its details. On HTTP `400 BAD_REQUEST`, display backend field-level validation messages next to the relevant fields and preserve
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `test-strategy.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/test-strategy.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Test Strategy
+
+This strategy maps tests to the finalized requirements and acceptance criteria. It is intentionally small for a one-hour assignment: use the repository's existing test tools, deterministic fixtures, an isolated test database, and focused integration tests. Do not add performance or load tests, Testcontainers, external services, contract-testing frameworks, authentication/security suites, or other infrastructure not required by the specifications.
+
+## Testing Levels
+
+- **Unit tests:** Test small pure behavior in isolation, such as status-transition decisions and any focused search normalization logic. Do not duplicate HTTP, persistence, or validation-framework behavior here.
+- **Service/business-rule tests:** Test ticket creation defaults, allowed and rejected state changes, update semantics, and coordination of business operations. Isolate collaborators only where useful; the state machine must also be tested through the REST API.
+- **Repository/persistence tests:** Where useful, verify ticket and comment save/load behavior and query behavior against the configured H2 database. Verify persistence across restart with file-based H2 where practical.
+- **REST/controller/integration tests:** Exercise the documented routes, JSON request/response DTOs, backend validation, HTTP status codes, error structure, not-found behavior, search/filter combinations, and state transitions. These tests must use the real application boundary and test database rather than mocking the controller or service behavior under test.
+- **Frontend tests:** Keep tests focused on practical required interactions: list loading and errors, create/edit validation errors, displaying ticket details/comments, and handling a rejected status transition. Do not introduce a frontend test framework solely for exhaustive component coverage if one is not already available.
+
+## State-Machine Coverage
+
+Use REST integration tests against `PATCH /api/tickets/{id}/stat
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `java-springboot.md`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/java-springboot.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Java 21 and Spring Boot Guidelines
+
+Use Java 21 language and standard-library features where they improve clarity. Follow the Java and Spring Boot versions, dependencies, and conventions established by the repository; do not upgrade or introduce dependencies without a requirement.
+
+## Architecture
+
+- Keep responsibilities separated: controllers handle HTTP concerns, services coordinate use cases, and repositories handle persistence. Keep business rules in an appropriate domain or service layer rather than in controllers or persistence code.
+- Make dependencies explicit with constructor injection. Avoid field injection and service-locator patterns.
+- Keep boundaries small and cohesive. Add an abstraction only when it expresses a real domain concept, isolates a meaningful dependency, or removes substantial duplication.
+
+## Data and Validation
+
+- Use request and response DTOs at API boundaries. Do not expose persistence entities as API contracts.
+- Validate untrusted input at the boundary with Jakarta Bean Validation where appropriate, and enforce important invariants in the business layer as well.
+- Use explicit mapping between API models and domain or persistence models. Keep mapping straightforward and avoid generic mapping frameworks unless the project already uses one for good reason.
+
+## Errors and Maintainability
+
+- Translate expected domain and persistence failures into deliberate application errors. Handle HTTP translation centrally rather than duplicating it in controllers.
+- Prefer clear names, focused methods, immutable values where practical, and straightforward control flow. Avoid speculative features, redundant wrappers, and abstractions that obscure behavior.
+- Keep configuration externalized. Avoid hidden mutable global state and catch exceptions only when the code can handle or meaningfully translate them.
+
+## Security
+
+- Apply authentication and authorization according to the approved requirements; enforce access checks on every relevant operation,
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `api-standards.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/api-standards.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# API Standards
+
+Treat approved specifications as the source of truth for API behavior. Record contract decisions there before implementation when a convention is not yet specified.
+
+## REST and Naming
+
+- Model endpoints as resource-oriented paths, using consistent plural nouns for collections and stable identifiers for individual resources. Avoid verbs in paths unless an explicitly modeled action cannot be represented clearly as a resource operation.
+- Use consistent casing and nesting. Keep nesting shallow and do not expose database table names or internal implementation details.
+- Use JSON consistently for request and response bodies unless the contract requires another media type. Represent dates and times in a documented, unambiguous format.
+
+## HTTP Methods and Status Codes
+
+- Use `GET` to read, `POST` to create or invoke a documented non-idempotent operation, `PUT` to replace, `PATCH` to partially update, and `DELETE` to remove a resource.
+- Preserve HTTP method safety and idempotency semantics. Document concurrency behavior and repeat-request behavior where relevant.
+- Use status codes consistently: `200` for a successful response with a body, `201` for resource creation, `204` for success without a body, `400` for malformed or invalid requests, `401` for missing or invalid authentication, `403` for insufficient permission, `404` for unavailable resources, and `409` for conflicts with current state. Use other codes only when the contract defines their meaning.
+
+## Validation and Errors
+
+- Validate request shape and values at the API boundary, and return client errors in the documented format. Do not rely on clients to enforce server-side rules.
+- Use one consistent error-response structure across endpoints. Include a stable machine-readable error identifier and safe message; include field-level details when useful and specified. Do not expose stack traces, SQL, internal class names, secrets, or sensitive data.
+- Map expected validation, authorization, not-fo
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The requested documents are read. I’m inspecting the current Comment entity, repository, request/response DTOs, service, and controller now; this should clarify whether detail comments already work and expose any integration gap before adding the comment endpoint.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short; curl -sS -o /dev/null -w '%\{http\_code\}\\n' http://localho...`
+
+Confirm current modifications and determine whether the previous isolated API server is still running.
+
+```bash
+git status --short; curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:18081/api/tickets || true
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? src/main/java/com/supportticket/controller/TicketController.java
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/
+200
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `Comment.java`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/entity/Comment.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.entity;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+@Entity
+@Table(name = "comments")
+public class Comment {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.UUID)
+	private UUID id;
+
+	@NotNull
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "ticket_id", nullable = false)
+	private Ticket ticket;
+
+	@NotBlank
+	@Lob
+	@Column(nullable = false)
+	private String author;
+
+	@NotBlank
+	@Size(min = 1, max = 1000)
+	@Column(nullable = false, length = 1000)
+	private String content;
+
+	@CreationTimestamp
+	@Column(nullable = false, updatable = false)
+	private Instant createdAt;
+
+	protected Comment() {
+	}
+
+	public Comment(Ticket ticket, String author, String content) {
+		this.ticket = ticket;
+		this.author = author;
+		this.content = content;
+	}
+
+	public UUID getId() {
+		return id;
+	}
+
+	public Ticket getTicket() {
+		return ticket;
+	}
+
+	public void setTicket(Ticket ticket) {
+		this.ticket = ticket;
+	}
+
+	public String getAuthor() {
+		return author;
+	}
+
+	public void setAuthor(String author) {
+		this.author = author;
+	}
+
+	public String getContent() {
+		return content;
+	}
+
+	public void setContent(String content) {
+		this.content = content;
+	}
+
+	public Instant getCreatedAt() {
+		return createdAt;
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CommentRepository.java`
+
+**Input:**
+
+- endLine: `160`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/repository/CommentRepository.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.repository;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.supportticket.entity.Comment;
+
+public interface CommentRepository extends JpaRepository<Comment, UUID> {
+
+	List<Comment> findByTicket_Id(UUID ticketId);
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CreateCommentRequest.java`
+
+**Input:**
+
+- endLine: `140`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/CreateCommentRequest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record CreateCommentRequest(
+		@NotBlank(message = "Author is required")
+		String author,
+		@NotBlank(message = "Content is required")
+		@Size(min = 1, max = 1000, message = "Content must contain 1-1000 characters")
+		String content) {
+
+	@JsonAnySetter
+	public void rejectUnknownProperty(String name, JsonNode value) {
+		throw new IllegalArgumentException("Unrecognized request field");
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CommentResponse.java`
+
+**Input:**
+
+- endLine: `140`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/dto/CommentResponse.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.dto;
+
+import java.time.Instant;
+import java.util.UUID;
+
+public record CommentResponse(
+		UUID id,
+		UUID ticketId,
+		String author,
+		String content,
+		Instant createdAt) {
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketService.java`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Comment;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class TicketService {
+
+	private static final Map<TicketStatus, Set<TicketStatus>> ALLOWED_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public TicketService(TicketRepository ticketRepository, Validator validator) {
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public TicketResponse createTicket(CreateTicketRequest request) {
+		validate(request);
+		Ticket ticket = new Ticket(request.title(), request.description(), request.priority(), request.assignee());
+		ticket.setStatus(TicketStatus.OPEN);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional(readOnly = true)
+	public TicketResponse getTicketById(UUID ticketId) {
+		return ticketRepository.findById(ticketId)
+				.map(this::toDetailResponse)
+				.orElseThrow(
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketController.java`
+
+**Input:**
+
+- endLine: `260`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller/TicketController.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.controller;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.service.TicketService;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/tickets")
+public class TicketController {
+
+	private final TicketService ticketService;
+
+	public TicketController(TicketService ticketService) {
+		this.ticketService = ticketService;
+	}
+
+	@PostMapping
+	public ResponseEntity<TicketResponse> createTicket(@RequestBody CreateTicketRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.createTicket(request));
+	}
+
+	@GetMapping
+	public List<TicketResponse> listTickets(
+			@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "status", required = false) TicketStatus status) {
+		return ticketService.listTickets(keyword, status);
+	}
+
+	@GetMapping("/{id}")
+	public TicketResponse getTicketById(@PathVariable("id") UUID id) {
+		return ticketService.getTicketById(id);
+	}
+
+	@PutMapping("/{id}")
+	public TicketResponse updateTicket(@PathVariable("id") UUID id,
+			@RequestBody UpdateTicketReque
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketServiceTest.java`
+
+**Input:**
+
+- endLine: `400`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+
+class TicketServiceTest {
+
+	private static final ValidatorFactory VALIDATOR_FACTORY = Validation.buildDefaultValidatorFactory();
+	private static final Map<TicketStatus, Set<TicketStatus>> VALID_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+	private static final UUID TICKET_ID = UUI
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `pom.xml`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/pom.xml`
+- startLine: `1`
+
+**Result:**
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.5.6</version>
+		<relativePath />
+	</parent>
+
+	<groupId>com.supportticket</groupId>
+	<artifactId>support-ticket-management</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>support-ticket-management</name>
+	<description>Support Ticket Management System backend</description>
+
+	<properties>
+		<java.version>21</java.version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+</project>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The existing Comment entity already generates its UUID and  during JPA flush; the DTO has the approved author/content constraints, and `GET` detail mapping already serializes associated comments. The missing pieces are a CommentService using both repositories and a delegated `POST /{id}/comments`; I’ll add those plus five focused HTTP integration tests for creation, generation, validation, missing tickets, and detail inclusion.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **CommentService.java**</summary>
+
+@@ lines 1-1 @@
+
+```
+package com.supportticket.service;
+
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateCommentRequest;
+import com.supportticket.entity.Comment;
+import com.supportticket.entity.Ticket;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.CommentRepository;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class CommentService {
+
+	private final CommentRepository commentRepository;
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public CommentService(CommentRepository commentRepository, TicketRepository ticketRepository,
+			Validator validator) {
+		this.commentRepository = commentRepository;
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public CommentResponse addComment(UUID ticketId, CreateCommentRequest request) {
+		validate(request);
+		Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(TicketNotFoundException::new);
+		Comment comment = commentRepository.saveAndFlush(new Comment(ticket, request.author(), request.content()));
+		return new CommentResponse(
+				comment.getId(),
+				comment.getTicket().getId(),
+				comment.getAuthor(),
+				comment.getContent(),
+				comment.getCreatedAt());
+	}
+
+	private void validate(CreateCommentRequest request) {
+		var violations = validator.validate(request);
+		if (!violations.isEmpty()) {
+			throw new ConstraintViolationException(violations);
+		}
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketController.java**</summary>
+
+@@ lines 1-77 @@
+
+```
+package com.supportticket.controller;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateCommentRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.service.CommentService;
+import com.supportticket.service.TicketService;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/tickets")
+public class TicketController {
+
+	private final TicketService ticketService;
+	private final CommentService commentService;
+
+	public TicketController(TicketService ticketService, CommentService commentService) {
+		this.ticketService = ticketService;
+		this.commentService = commentService;
+	}
+
+	@PostMapping
+	public ResponseEntity<TicketResponse> createTicket(@RequestBody CreateTicketRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.createTicket(request));
+	}
+
+	@GetMapping
+	public List<TicketResponse> listTickets(
+			@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "status", required = false) TicketStatus status) {
+		return ticketService.listTickets(keyword, status);
+	}
+
+	@GetMapping("/{id}")
+	public TicketResponse getTicketById(@PathVariable("id") UUID id) {
+		return ticketService.getTicketById(id);
+	}
+
+	@PutMapping("/{id}")
+	public TicketResponse updateTicket(@PathVariable("id") UUID id,
+			@RequestBody UpdateTicketRequest request) {
+		return ticketService.updateTicket(id, request);
+	}
+
+	@PatchMapping("/{id}/status")
+	public TicketResponse changeTicketStatus(@PathVariable("id") UUID id,
+			@Valid @RequestBody ChangeTicketStatusRequest request) {
+		return ticketService.changeTicketStatus(id, request.status());
+	}
+
+	@PostMapping("/{id}/comments")
+	public ResponseEntity<CommentResponse> addComment(@PathVariable("id") UUID id,
+			@RequestBody CreateCommentRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(commentService.addComment(id, request));
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **CommentControllerIntegrationTest.java**</summary>
+
+@@ lines 1-1 @@
+
+```
+package com.supportticket.controller;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import com.supportticket.dto.ApiErrorResponse;
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateCommentRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.entity.Priority;
+import com.supportticket.repository.CommentRepository;
+import com.supportticket.repository.TicketRepository;
+import com.supportticket.service.TicketService;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+		"spring.datasource.url=jdbc:h2:mem:comment-api-test;DB_CLOSE_DELAY=-1",
+		"spring.jpa.hibernate.ddl-auto=create-drop" })
+class CommentControllerIntegrationTest {
+
+	private static final UUID CLIENT_COMMENT_ID = UUID.fromString("7b8e6f40-2e9a-4d1f-bb94-4a1e9a8bb4f2");
+	private static final Instant CLIENT_TIMESTAMP = Instant.parse("2020-01-01T00:00:00Z");
+
+	@LocalServerPort
+	private int port;
+
+	@Autowired
+	private TestRestTemplate restTemplate;
+
+	@Autowired
+	private TicketRepository ticketRepository;
+
+	@Autowired
+	private CommentRepository commentRepository;
+
+	@Autowired
+	private TicketService ticketService;
+
+	@BeforeEach
+	void clearDatabase() {
+		commentRepository.deleteAll();
+		ticketRepository.deleteAll();
+	}
+
+	@Test
+	void createsCommentWithSuppliedFieldsAndServerGeneratedValues() {
+		UUID ticketId = createTicket();
+
+		ResponseEntity<CommentResponse> response = restTemplate.postForEntity(
+				commentsUrl(ticketId), new CreateCommentRequest("John", "Investigating the issue"), CommentResponse.class);
+
+		assertEquals(HttpStatus.CREATED, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertNotNull(response.getBody().id());
+		assertNotEquals(CLIENT_COMMENT_ID, response.getBody().id());
+		assertEquals(ticketId, response.getBody().ticketId());
+		assertEquals("John", response.getBody().author());
+		assertEquals("Investigating the issue", response.getBody().content());
+		assertNotNull(response.getBody().createdAt());
+		assertNotEquals(CLIENT_TIMESTAMP, response.getBody().createdAt());
+	}
+
+	@Test
+	void rejectsInvalidCommentFieldsWithFieldErrors() {
+		UUID ticketId = createTicket();
+		CreateCommentRequest invalidRequest = new CreateCommentRequest("", "x".repeat(1001));
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		ResponseEntity<ApiErrorResponse> response = restTemplate.exchange(
+				commentsUrl(ticketId), HttpMethod.POST, new HttpEntity<>(invalidRequest, headers),
+				ApiErrorResponse.class);
+
+		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertEquals("VALIDATION_ERROR", response.getBody().code());
+		assertEquals("/api/tickets/" + ticketId + "/comments", response.getBody().path());
+		assertNotNull(response.getBody().errors());
+		assertEquals(true, response.getBody().errors().containsKey("author"));
+		assertEquals(true, response.getBody().errors().containsKey("content"));
+	}
+
+	@Test
+	void returnsNotFoundWhenAddingCommentToMissingTicket() {
+		UUID missingTicketId = UUID.randomUUID();
+
+		ResponseEntity<ApiErrorResponse> response = restTemplate.postForEntity(
+				commentsUrl(missingTicketId), new CreateCommentRequest("John", "Investigating the issue"),
+				ApiErrorResponse.class);
+
+		assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertEquals("NOT_FOUND", response.getBody().code());
+		assertEquals("/api/tickets/" + missingTicketId + "/comments", response.getBody().path());
+	}
+
+	@Test
+	void includesCreatedCommentInTicketDetails() {
+		UUID ticketId = createTicket();
+		ResponseEntity<CommentResponse> created = restTemplate.postForEntity(
+				commentsUrl(ticketId), new CreateCommentRequest("John", "Investigating the issue"), CommentResponse.class);
+
+		ResponseEntity<TicketResponse> details = restTemplate.getForEntity(ticketUrl(ticketId), TicketResponse.class);
+
+		assertEquals(HttpStatus.OK, details.getStatusCode());
+		assertNotNull(details.getBody());
+		assertNotNull(details.getBody().comments());
+		assertEquals(1, details.getBody().comments().size());
+		assertEquals(created.getBody().id(), details.getBody().comments().getFirst().id());
+		assertEquals(ticketId, details.getBody().comments().getFirst().ticketId());
+	}
+
+	private UUID createTicket() {
+		return ticketService.createTicket(new CreateTicketRequest("Comment test ticket", "Ticket description",
+				Priority.MEDIUM, null)).id();
+	}
+
+	private String commentsUrl(UUID ticketId) {
+		return ticketUrl(ticketId) + "/comments";
+	}
+
+	private String ticketUrl(UUID ticketId) {
+		return "http://localhost:" + port + "/api/tickets/" + ticketId;
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+ now validates with the existing DTO constraints, resolves the parent ticket before writing, flushes to obtain the server-generated ID/time, and returns only a . The controller delegates `POST /api/tickets/{id}/comments`; the added integration tests use isolated H2 and clear comments before tickets. I’m compiling all sources/tests now.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Compile every production and test source after adding comment functionality.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step14-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step14-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step14-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step14-classes $(find src/main/java -name '*.java') && java
+c --release 21 -cp "/tmp/c2jir-ticket-step14-classes:$dependency_classpath" -d /
+tmp/c2jir-ticket-step14-test-classes $(find src/test/java -name '*.java')
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Compilation succeeded. Maven is still absent in this environment; I’m making the required test-command attempt and checking editor diagnostics, then I’ll launch the newly compiled web app on a separate isolated port for HTTP verification of comment creation and ticket details.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` mvn test`
+
+Attempt the project's normal test/build command for the comment functionality step.
+
+```bash
+mvn test
+```
+
+**Result:**
+
+```
+Command 'mvn' not found, but can be installed with:
+sudo apt install maven
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `CommentService.java`, `TicketController.java`, `CommentControllerIntegrationTest.java`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/CommentService.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller/TicketController.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.java"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/CommentService.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller/TicketController.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.java">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Start the updated Spring web application with isolated in-memory H2 for comment endpoint and detail-response checks.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step14-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18082 '--spring.datasource.url=jdbc:h2:mem:step14-comment-api;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+```
+
+**Result:**
+
+```
+Command is running in terminal with ID=b1f929a9-9f9f-4d98-931b-9858db269dc9
+ The command became idle with output:
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step14-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18082 '--spring.datasource.url=jdbc:h2:mem:step14-comment-api;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2026-09-27T17:58:42.281+05:30  INFO 14658 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : Starting SupportTicketApplication using Java 21.0.2 with PID 14658 (/tmp/c2jir-ticket-step14-classes started by sandeep in /home/sandeep/Desktop/c2_project/c2JiraTicket)
+2026-09-27T17:58:42.288+05:30  INFO 14658 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : No active profile set, falling back to 1 default profile: "default"
+2026-09-27T17:58:43.813+05:30  INFO 14658 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-27T17:58:43.934+05:30  INFO 14658 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 99 ms. Found 2 JPA repository interfaces.
+2026-09-27T17:58:45.097+05:30  INFO 14658 --- [support-ticket-management] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 18082 (http)
+2026-09-27T17:58:45.128+05:30 
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` base\_url=http://localhost:18082/api/tickets && ticket\_response=$\(curl -sS -w...`
+
+Verify comment creation, server-generated ID/timestamp, ticket detail inclusion, validation failures, missing-ticket handling, and rejection of client-generated fields.
+
+```bash
+base_url=http://localhost:18082/api/tickets && ticket_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"title":"Comment test ticket","description":"Ticket description","priority":"MEDIUM"}' "$base_url") && ticket_body=${ticket_response%$'\n'*} && ticket_status=${ticket_response##*$'\n'} && ticket_id=$(printf '%s' "$ticket_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p') && [[ "$ticket_status" == "201" && -n "$ticket_id" ]] && comment_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"author":"John","content":"Investigating the issue"}' "$base_url/$ticket_id/comments") && comment_body=${comment_response%$'\n'*} && comment_status=${comment_response##*$'\n'} && comment_id=$(printf '%s' "$comment_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p') && [[ "$comment_status" == "201" && -n "$comment_id" && "$comment_body" == *"\"ticketId\":\"$ticket_id\""* && "$comment_body" == *'"author":"John"'* && "$comment_body" == *'"createdAt":"'* ]] && detail_response=$(curl -sS -w '\n%{http_code}' "$base_url/$ticket_id") && detail_status=${detail_response##*$'\n'} && [[ "$detail_status" == "200" && "$detail_response" == *"\"id\":\"$comment_id\""* && "$detail_response" == *'"comments":['* ]] && invalid_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d "{\"author\":\"\",\"content\":\"$(printf 'x%.0s' {1..1001})\"}" "$base_url/$ticket_id/comments") && invalid_body=${invalid_response%$'\n'*} && invalid_status=${invalid_response##*$'\n'} && [[ "$invalid_status" == "400" && "$invalid_body" == *'"code":"VALIDATION_ERROR"'* && "$invalid_body" == *'"author":'* && "$invalid_body" == *'"content":'* ]] && missing_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"author":"John","content":"Investigating"}' "$base_url/00000000-0000-0000-0000-000000000001/comments") && missing_body=${missing_response%$'\n'*} && missing_status=${missing_response##*$'\n'} && [[ "$missing_status" == "404" && "$missing_body" == *'"code":"NOT_FOUND"'* ]] && forbidden_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"id":"7b8e6f40-2e9a-4d1f-bb94-4a1e9a8bb4f2","ticketId":"00000000-0000-0000-0000-000000000001","author":"John","content":"Investigating","createdAt":"2020-01-01T00:00:00Z"}' "$base_url/$ticket_id/comments") && forbidden_status=${forbidden_response##*$'\n'} && [[ "$forbidden_status" == "400" ]] && printf 'Comment HTTP checks passed: generated values, 201, detail inclusion, validation 400, missing ticket 404, client-generated fields rejected\n'
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  base_url=http://loc
+alhost:18082/api/tickets && ticket_response=$(curl -sS -w '\n%{http_code}' -X PO
+ST -H 'Content-Type: application/json' -d '{"title":"Comment test ticket","descr
+iption":"Ticket description","priority":"MEDIUM"}' "$base_url") && ticket_body=$
+{ticket_response%$'\n'*} && ticket_status=${ticket_response##*$'\n'} && ticket_i
+d=$(printf '%s' "$ticket_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p') && [[ "$t
+icket_status" == "201" && -n "$ticket_id" ]] && comment_response=$(curl -sS -w '
+\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"author":"John"
+,"content":"Investigating the issue"}' "$base_url/$ticket_id/comments") && comme
+nt_body=${comment_response%$'\n'*} && comment_status=${comment_response##*$'\n'}
+ && comment_id=$(printf '%s' "$comment_body" | sed -n 's/.*"id":"\([^"]*\)".*/\1
+/p') && [[ "$comment_status" == "201" && -n "$comment_id" && "$comment_body" ==
+*"\"ticketId\":\"$ticket_id\""* && "$comment_body" == *'"author":"John"'* && "$c
+omment_body" == *'"createdAt":"'* ]] && detail_response=$(curl -sS -w '\n%{http_
+code}' "$base_url/$ticket_id") && detail_status=${detail_response##*$'\n'} && [[
+ "$detail_status" == "200" && "$detail_response" == *"\"id\":\"$comment_id\""* &
+& "$detail_response" == *'"comments":['* ]] && invalid_response=$(curl -sS -w '\
+n%{http_code}' -X POST -H 'Content-Type: application/json' -d "{\"author\":\"\",
+\"content\":\"$(printf 'x%.0s' {1..1001})\"}" "$base_url/$ticket_id/comments") &
+& invalid_body=${invalid_response%$'\n'*} && invalid_status=${invalid_response##
+*$'\n'} && [[ "$invalid_status" == "400" && "$invalid_body" == *'"code":"VALIDAT
+ION_ERROR"'* && "$invalid_body" == *'"author":'* && "$invalid_body" == *'"conten
+t":'* ]] && missing_response=$(curl -sS -w '\n%{http_code}' -X POST -H 'Content-
+Type: application/json' -d '{"author":"John","content":"Investigating"}' "$base_
+url/00000000-0000-0000-0000-000000000001/comments") && mi
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The live API checks passed: comments return 201 with generated ID/time, appear in ticket details, invalid author/content returns 400 field errors, a missing parent returns 404, and client-supplied comment IDs/timestamps are rejected. I’m stopping the isolated server and checking cached JUnit runner availability to see whether the added integration tests can be executed despite Maven being 
+
+The live API checks passed: comments return 201 with generated ID/time, appear in ticket details, invalid author/content returns 400 field errors, a missing parent returns 404, and client-supplied comment IDs/timestamps are rejected. I’m stopping the isolated server and checking cached JUnit runner availability to see whether the added integration tests can be executed despite Maven being missing.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` find "$HOME/.m2/repository/org/junit" -type f -name '\*.jar' -print; find "$H...`
+
+Check whether JUnit Platform and Spring Test artifacts are cached for running the added integration tests without Maven.
+
+```bash
+find "$HOME/.m2/repository/org/junit" -type f -name '*.jar' -print; find "$HOME/.m2/repository/org/springframework" -path '*spring-test*' -type f -name '*.jar' -print
+```
+
+**Result:**
+
+```
+/home/sandeep/.m2/repository/org/junit/jupiter/junit-jupiter/5.12.2/junit-jupite
+r-5.12.2.jar
+/home/sandeep/.m2/repository/org/junit/jupiter/junit-jupiter-api/5.12.2/junit-ju
+piter-api-5.12.2.jar
+/home/sandeep/.m2/repository/org/junit/jupiter/junit-jupiter-params/5.12.2/junit
+-jupiter-params-5.12.2.jar
+/home/sandeep/.m2/repository/org/junit/jupiter/junit-jupiter-engine/5.12.2/junit
+-jupiter-engine-5.12.2.jar
+/home/sandeep/.m2/repository/org/junit/platform/junit-platform-commons/1.12.2/ju
+nit-platform-commons-1.12.2.jar
+/home/sandeep/.m2/repository/org/junit/platform/junit-platform-engine/1.12.2/jun
+it-platform-engine-1.12.2.jar
+/home/sandeep/.m2/repository/org/springframework/spring-test/6.2.11/spring-test-
+6.2.11.jar
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="kill_terminal"><details>
+<summary>Tool use: **kill_terminal**</summary>
+
+Killed terminal
+
+**Input:**
+
+- id: `b1f929a9-9f9f-4d98-931b-9858db269dc9`
+
+**Result:**
+
+```
+Successfully killed persistent terminal b1f929a9-9f9f-4d98-931b-9858db269dc9. Final output before termination:
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step14-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18082 '--spring.datasource.url=jdbc:h2:mem:step14-comment-api;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2026-09-27T17:58:42.281+05:30  INFO 14658 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : Starting SupportTicketApplication using Java 21.0.2 with PID 14658 (/tmp/c2jir-ticket-step14-classes started by sandeep in /home/sandeep/Desktop/c2_project/c2JiraTicket)
+2026-09-27T17:58:42.288+05:30  INFO 14658 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : No active profile set, falling back to 1 default profile: "default"
+2026-09-27T17:58:43.813+05:30  INFO 14658 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-27T17:58:43.934+05:30  INFO 14658 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 99 ms. Found 2 JPA repository interfaces.
+2026-09-27T17:58:45.097+05:30  INFO 14658 --- [support-ticket-management] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 18082 (http)
+2026-09-27T17:58:45.128+05:30  IN
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The updated context and HTTP verification succeeded, and JUnit/Spring Test artifacts are cached even though Maven and the JUnit launcher are not. I can still execute the added integration test class through Spring’s `TestContextManager`, so I’m trying that against its declared random-port, in-memory-H2 setup rather than adding build infrastructure.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Run the four compiled comment API integration tests using Spring TestContext directly, avoiding unavailable Maven/JUnit launcher infrastructure.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step14-classes:/tmp/c2jir-ticket-step14-test-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.CommentControllerIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPresent(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : testClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(true); try { method.invoke(instance); manager.afterTestMethod(instance, method, null); passed++; System.out.println("PASS " + method.getName()); } catch (InvocationTargetException exception) { manager.afterTestMethod(instance, method, exception.getCause()); manager.afterTestClass(); throw new RuntimeException(exception.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " CommentControllerIntegrationTest cases");
+if (passed != 4) System.exit(1);
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step14-c
+lasses:/tmp/c2jir-ticket-step14-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.CommentControll
+erIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " CommentControllerIntegrationTest cases
+EOFitassed != 4) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.Comment
+ControllerIntegrationTest")testClass ==> class com.supportticket.controller.Comm
+entControllerIntegr
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `content.txt`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_89K9rYHXDGgZtxJX8hcp4w5K__vscode-1790509702667/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step14-c
+lasses:/tmp/c2jir-ticket-step14-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.CommentControll
+erIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " CommentControllerIntegrationTest cases
+EOFitassed != 4) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.Comment
+ControllerIntegrationTest")testClass ==> class com.supportticket.controller.Comm
+entControllerIntegr
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+All four new integration tests passed through Spring’s real TestContext, and the test context shut down cleanly. I’m doing final diagnostics and checking/stopping any remaining isolated Step 13 server so no validation process is left running.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short`
+
+Collect the final changed-file set and ensure no specifications were touched.
+
+```bash
+git status --short
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? src/main/java/com/supportticket/controller/TicketController.java
+?? src/main/java/com/supportticket/service/CommentService.java
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `TicketController.java`, `CommentService.java`, `CommentControllerIntegrationTest.java`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller/TicketController.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/CommentService.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.java"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller/TicketController.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/CommentService.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.java">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="kill_terminal"><details>
+<summary>Tool use: **kill_terminal**</summary>
+
+Killed terminal
+
+**Input:**
+
+- id: `cc8bc456-e6fc-490e-9273-f8d01ed38163`
+
+**Result:**
+
+```
+Successfully killed persistent terminal cc8bc456-e6fc-490e-9273-f8d01ed38163. Final output before termination:
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && java -cp "/tmp/c2jir-ticket-step13-classes:src/main/resources:$dependency_classpath" com.supportticket.SupportTicketApplication --server.port=18081 '--spring.datasource.url=jdbc:h2:mem:step13-web-fixed;DB_CLOSE_DELAY=-1' --spring.jpa.hibernate.ddl-auto=create-drop
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.6)
+
+2026-09-27T17:51:08.710+05:30  INFO 13637 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : Starting SupportTicketApplication using Java 21.0.2 with PID 13637 (/tmp/c2jir-ticket-step13-classes started by sandeep in /home/sandeep/Desktop/c2_project/c2JiraTicket)
+2026-09-27T17:51:08.716+05:30  INFO 13637 --- [support-ticket-management] [           main] c.s.SupportTicketApplication             : No active profile set, falling back to 1 default profile: "default"
+2026-09-27T17:51:09.962+05:30  INFO 13637 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-27T17:51:10.078+05:30  INFO 13637 --- [support-ticket-management] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 95 ms. Found 2 JPA repository interfaces.
+2026-09-27T17:51:11.138+05:30  INFO 13637 --- [support-ticket-management] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 18081 (http)
+2026-09-27T17:51:11.162+05:30  INFO
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Implemented `POST /api/tickets/{id}/comments` through a new ; it verifies the parent ticket, validates the request, persists via , and returns a . Ticket detail responses already included comments, so that behavior required no change.
+
+**Files changed**
+- `src/main/java/com/supportticket/service/CommentService.java`
+- `src/main/java/com/supportticket/controller/TicketController.java`
+- `src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.java`
+
+**Validation and tests**
+Author is required; content is required and limited to 1–1000 characters. The entity generates the comment UUID and timestamp. Four integration tests passed using Spring TestContext with isolated H2, covering creation/generated values, validation errors, missing tickets, and comments in ticket details. Production and test sources compiled, and HTTP smoke checks passed. `mvn test` could not run because Maven is not installed.
+
+No specification files were changed. The implementation follows the API contract; no requirement ambiguity was found.
+
+---
+
+_**User (2026-09-27 12:31:38Z)**_
+
+Implement STEP 15 of the implementation plan: Backend integration and API tests.
+
+First read:
+- spec/requirements.md
+- spec/state-machine.md
+- spec/api-contract.md
+- spec/test-strategy.md
+- plan/implementation-plan.md
+- rules/testing.md
+- rules/java-springboot.md
+
+Inspect the existing implementation before writing tests. Do not change production behavior just to make tests pass.
+
+Use the project's existing test stack. Prefer Spring Boot integration tests with MockMvc (or the existing equivalent) so important tests exercise the REST API rather than only calling service methods.
+
+Create focused tests covering:
+
+1. Ticket creation
+- valid ticket returns 201
+- newly created ticket has status OPEN
+- invalid title/description/priority returns 400
+- response follows the documented error structure
+
+2. Ticket retrieval
+- GET existing ticket returns 200
+- GET non-existent ticket returns 404
+
+3. Ticket update
+- valid PUT updates title, description, priority and assignee
+- status cannot be changed through PUT
+- validation failure returns 400
+
+4. Search and filtering
+- keyword searches title and description case-insensitively
+- status filtering works
+- keyword + status combination works
+- blank keyword does not incorrectly filter results
+
+5. Comments
+- valid comment creation returns 201
+- invalid author/content returns 400
+- comment for non-existent ticket returns 404
+- created comment contains server-generated id and createdAt
+- GET ticket details includes comments
+
+6. STATE MACHINE — MUST TEST THROUGH THE REST API
+
+Valid transitions:
+OPEN -> IN_PROGRESS
+IN_PROGRESS -> RESOLVED
+RESOLVED -> CLOSED
+OPEN -> CANCELLED
+IN_PROGRESS -> CANCELLED
+
+For every valid transition:
+- create a ticket in the required current state
+- call PATCH /api/tickets/{id}/status
+- verify successful response
+- verify persisted status
+
+Invalid transitions must include at minimum:
+CLOSED -> OPEN
+RESOLVED -> OPEN
+CANCELLED -> OPEN
+same state -> same state
+
+For every invalid transition:
+- PATCH the status
+- verify HTTP 409
+- verify error code is INVALID_STATUS_TRANSITION
+- verify the ticket status remains unchanged
+
+7. State-machine completeness
+Explicitly verify that CLOSED and CANCELLED have no outgoing valid transitions.
+
+8. Error handling
+Verify:
+- 400 for validation errors
+- 404 for missing ticket
+- 409 for invalid status transition
+- error response contains status, code, message and path as specified
+
+9. Persistence
+Do not add unnecessary infrastructure such as Testcontainers.
+Keep the application's production configuration using file-based H2 as already specified.
+
+If testing restart persistence inside the automated test suite would create unnecessary complexity, document it as a manual acceptance test rather than weakening the production configuration.
+
+Testing rules:
+- Tests must be deterministic.
+- Do not test implementation details unnecessarily.
+- Do not modify production code merely to satisfy a test.
+- Do not add unrelated performance/security/load tests.
+
+After implementation:
+1. Run the complete backend test suite.
+2. Fix only genuine implementation defects discovered by the tests.
+3. Report:
+   - test files added/changed
+   - number/categories of tests
+   - state-machine transitions covered
+   - any failures discovered
+   - any production-code fixes made because of real test failures
+   - final test result
+
+---
+
+_**Agent (copilot/auto)**_
+
+<think><details><summary>Thought Process</summary>
+The implementation already exposes all required routes, uses service-level validation, and has a separate comment integration suite. I’ll add one isolated-H2 Ticket REST integration class that exercises all five valid and all twenty invalid state pairs through HTTP, plus CRUD/search/error structure checks; I’ll also correct the existing unit test’s “never saved” verification to target `saveAndFlush`, the method the service actually uses.
+
+The ticket integration class now covers the requested API behaviors and exhaustively checks all 20 invalid state pairs via PATCH followed by GET. I also fixed the two unit-test “no save” verifications to assert against `saveAndFlush`; I’m attempting the full Maven suite now, then I’ll fall back to the cached Java/Spring test runner if Maven is still unavailable.
+
+Compilation caught a test-only omission: the new integration test uses `assertNotEquals` but didn’t import it. I’m adding that static import and rerunning the same full-source compilation before executing tests.
+
+The first six API tests passed; the blank-keyword test failed because `TestRestTemplate` was double-encoding the literal `%20` query text, so the server received a nonblank keyword and returned no matches. This is a test URI construction issue, not yet evidence of a production defect; I’m switching that case to an explicitly encoded `URI` carrying actual whitespace, then rerunning the same integration suite.
+</details></think>
+
+_**Agent (copilot/auto)**_
+
+I’ll read the seven specified documents, then inspect the controllers, services, repository behavior, and existing tests before adding API-level coverage. I’ll keep production files untouched unless a test demonstrates a genuine defect.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `implementation-plan.md`
+
+**Input:**
+
+- endLine: `380`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/plan/implementation-plan.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Implementation Plan
+
+This plan follows the finalized specifications and repository rules. Implement only the required behavior; do not add authentication, Kafka, Redis, notifications, dashboards, pagination, Docker, microservices, cloud infrastructure, or other out-of-scope features. In particular, the backend state machine is authoritative: frontend transition controls are guidance and must not replace backend enforcement.
+
+Paths such as `<backend-root>` and `<frontend-root>` are placeholders for the chosen project layout. Create only files needed for the listed responsibilities.
+
+## Sequential Tasks
+
+### Task 01: Project and Backend Foundation
+
+- **Purpose:** Confirm the approved specifications as the implementation baseline; establish the minimal Java 21/Spring Boot backend application and build configuration.
+- **Files/packages likely to be created or changed:** `<backend-root>/` build and application configuration files; application bootstrap under the chosen root package.
+- **Dependencies/prerequisites:** All specification and guidance documents approved; none of the application layers exists yet.
+- **Validation/test expected:** Backend builds and starts with its test profile; verify Java 21 and Spring Boot configuration. No business behavior is added here.
+
+### Task 02: Domain Enums and Entities
+
+- **Purpose:** Define the ticket and comment domain/persistence shapes and approved value sets.
+- **Files/packages likely to be created or changed:** `<application-root>/entity/Ticket`, `Comment`; `<application-root>/entity/TicketStatus`, `Priority` (or equivalent domain package).
+- **Dependencies/prerequisites:** Task 01.
+- **Validation/test expected:** Compile and add focused model checks if the chosen persistence mapping requires them; confirm all enum values and fields match `spec/data-model.md`.
+
+### Task 03: Repository and Persistence
+
+- **Purpose:** Persist and retrieve tickets and comments using file-based H2 for local devel
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `requirements.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/requirements.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Requirements
+
+## Scope
+
+The system provides a user interface and REST API for creating, finding, viewing, and maintaining support tickets. Ticket data must be stored in a database and remain available after an application restart. The system must enforce the specified ticket status workflow on the backend.
+
+Technology constraints are Java 21, Spring Boot, PostgreSQL or H2, a REST API, and React/Next.js or an equivalent frontend. Use file-based H2 for local development so persisted data survives an application restart. Other environments may use PostgreSQL or H2. Except for the status-transition route defined below, these constraints do not prescribe endpoint shapes or screen layout.
+
+## Functional Requirements
+
+1. A user can create a ticket from the UI.
+2. A user can list tickets.
+3. A user can view the details of a ticket.
+4. A user can update a ticket's title, description, priority, and assignee. Assignee is an optional String field.
+5. A user can add comments to a ticket. Each comment contains `id`, `ticketId`, `author`, `content`, and `createdAt`. The server generates the comment `id` as a UUID and generates `createdAt`; the client supplies `author` as a String.
+6. A user can search tickets by keyword in the title and description using case-insensitive substring matching. A blank or whitespace-only keyword applies no search filter. Search can be combined with status filtering.
+7. A user can filter tickets by status.
+8. The system persists ticket data in a database so that it survives application restart.
+9. The backend validates input according to the validation requirements below.
+10. A client requests a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target `status`. The backend accepts only valid transitions and rejects invalid transitions, as defined in [state-machine.md](state-machine.md).
+11. The UI displays meaningful errors when an operation fails.
+
+## Non-Functional Requirements
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `state-machine.md`
+
+**Input:**
+
+- endLine: `250`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/state-machine.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Ticket State Machine
+
+This document defines the allowed ticket status transitions. The backend is authoritative and must reject transitions not listed as valid.
+
+New tickets always start in `OPEN`.
+
+## States
+
+- `OPEN`
+- `IN_PROGRESS`
+- `RESOLVED`
+- `CLOSED`
+- `CANCELLED`
+
+## Valid Transitions
+
+| Current state | Requested state | Result |
+| --- | --- | --- |
+| `OPEN` | `IN_PROGRESS` | Allowed |
+| `OPEN` | `CANCELLED` | Allowed |
+| `IN_PROGRESS` | `RESOLVED` | Allowed |
+| `IN_PROGRESS` | `CANCELLED` | Allowed |
+| `RESOLVED` | `CLOSED` | Allowed |
+
+## Invalid Transitions
+
+Any transition not listed in the valid-transition table is invalid, including same-state requests. `CLOSED` and `CANCELLED` are terminal states and have no outgoing transitions. Examples include:
+
+| Current state | Requested state | Result |
+| --- | --- | --- |
+| `CLOSED` | `OPEN` | Rejected |
+| `CLOSED` | `IN_PROGRESS` | Rejected |
+| `RESOLVED` | `OPEN` | Rejected |
+| `RESOLVED` | `CANCELLED` | Rejected |
+| `CANCELLED` | `OPEN` | Rejected |
+| `CANCELLED` | `IN_PROGRESS` | Rejected |
+| Any state | Same state | Rejected |
+
+## Transition Rules
+
+- A ticket may move only along a valid transition listed above.
+- Every new ticket starts in `OPEN`.
+- The backend must validate each requested transition; frontend restrictions do not replace backend validation.
+- Request a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target status, for example `{ "status": "IN_PROGRESS" }`.
+- A rejected transition must not change the ticket's current state.
+- Valid transitions have no additional business preconditions or required side effects.
+
+## Expected Backend Behavior for Invalid Transitions
+
+- Reject the requested transition and leave the ticket in its current state.
+- Return HTTP `409 CONFLICT`.
+- Return the error using the project's standard API error format.
+- Do not expose internal exception details.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `api-contract.md`
+
+**Input:**
+
+- endLine: `390`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/api-contract.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System API Contract
+
+This document defines the JSON REST contract for the required ticket and comment operations. Ticket and comment fields follow [data-model.md](data-model.md); ticket statuses and allowed transitions follow [state-machine.md](state-machine.md). Persistence entities are not exposed directly; the JSON resources below are API representations.
+
+Ticket IDs and comment IDs are server-generated UUIDs. The server generates `createdAt` and `updatedAt`; clients must not provide or modify IDs or timestamps. Timestamp values are read-only ISO-8601 strings in UTC, for example `2026-09-27T10:30:00Z`. In the examples below, `<server-generated timestamp>` stands in for a value in this format. New tickets start with status `OPEN`. No authentication, deletion, or pagination endpoints are included.
+
+## Common Error Response
+
+Errors use the consistent JSON structure defined in [requirements.md](requirements.md). Validation errors also contain field-level `errors`.
+
+Validation error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "Request validation failed",
+  "errors": {
+    "title": "Title is required"
+  },
+  "path": "/api/tickets"
+}
+```
+
+Not-found error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 404,
+  "code": "NOT_FOUND",
+  "message": "Ticket not found",
+  "path": "/api/tickets/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## Create Ticket
+
+- **Method:** `POST`
+- **Path:** `/api/tickets`
+- **Query parameters:** None
+- **Request JSON:** `title`, `description`, and `priority` are required. `assignee` is optional. Do not send `id`, `status`, `createdAt`, or `updatedAt`; the server generates the ID and timestamps and assigns `OPEN` status.
+
+```json
+{
+  "title": "Cannot access account",
+  "description": "The sign-in page returns an error.",
+  "priority": "HIGH",
+  "assignee": "Support Team"
+}
+```
+
+- **Success:** `201 CREATED`
+- *
+… (output truncated)
+````
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `test-strategy.md`
+
+**Input:**
+
+- endLine: `340`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/test-strategy.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Test Strategy
+
+This strategy maps tests to the finalized requirements and acceptance criteria. It is intentionally small for a one-hour assignment: use the repository's existing test tools, deterministic fixtures, an isolated test database, and focused integration tests. Do not add performance or load tests, Testcontainers, external services, contract-testing frameworks, authentication/security suites, or other infrastructure not required by the specifications.
+
+## Testing Levels
+
+- **Unit tests:** Test small pure behavior in isolation, such as status-transition decisions and any focused search normalization logic. Do not duplicate HTTP, persistence, or validation-framework behavior here.
+- **Service/business-rule tests:** Test ticket creation defaults, allowed and rejected state changes, update semantics, and coordination of business operations. Isolate collaborators only where useful; the state machine must also be tested through the REST API.
+- **Repository/persistence tests:** Where useful, verify ticket and comment save/load behavior and query behavior against the configured H2 database. Verify persistence across restart with file-based H2 where practical.
+- **REST/controller/integration tests:** Exercise the documented routes, JSON request/response DTOs, backend validation, HTTP status codes, error structure, not-found behavior, search/filter combinations, and state transitions. These tests must use the real application boundary and test database rather than mocking the controller or service behavior under test.
+- **Frontend tests:** Keep tests focused on practical required interactions: list loading and errors, create/edit validation errors, displaying ticket details/comments, and handling a rejected status transition. Do not introduce a frontend test framework solely for exhaustive component coverage if one is not already available.
+
+## State-Machine Coverage
+
+Use REST integration tests against `PATCH /api/tickets/{id}/stat
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `testing.md`
+
+**Input:**
+
+- endLine: `320`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/testing.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Testing Guidelines
+
+Derive expected behavior from approved specifications and existing project conventions. Do not invent business rules or state transitions to make a test pass.
+
+## Test Scope
+
+- Use unit tests for isolated business logic and decision-making. Replace external collaborators only where isolation is useful; do not mock the behavior under test.
+- Use integration tests for important framework, persistence, serialization, and component-boundary behavior. Keep them focused on observable contracts.
+- Test business rules through meaningful inputs and observable outcomes, including boundaries, invalid cases, and relevant combinations.
+- For stateful workflows, cover each specified state transition, rejected transition, and resulting state or side effect. Use only states and transitions defined by the approved specification.
+- Test request validation for required values, format and range constraints, and cross-field rules where specified. Confirm invalid requests produce the documented error response.
+
+## Test Quality
+
+- Name tests for the behavior and expected outcome, for example `rejectsTransitionWhenTicketIsClosed`.
+- Keep each test focused, readable, and independent. Assert outcomes and important side effects rather than implementation details.
+- Make tests deterministic: control time, randomness, generated identifiers, and external responses when they affect outcomes. Do not depend on execution order, real network services, arbitrary sleeps, or shared mutable fixtures.
+- Use representative fixtures and clean up test data. Avoid over-mocking, broad assertions, and tests that pass without proving a requirement.
+- Keep unit and integration test responsibilities distinct, and use the repository's existing test libraries and execution conventions.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `java-springboot.md`
+
+**Input:**
+
+- endLine: `290`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/rules/java-springboot.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Java 21 and Spring Boot Guidelines
+
+Use Java 21 language and standard-library features where they improve clarity. Follow the Java and Spring Boot versions, dependencies, and conventions established by the repository; do not upgrade or introduce dependencies without a requirement.
+
+## Architecture
+
+- Keep responsibilities separated: controllers handle HTTP concerns, services coordinate use cases, and repositories handle persistence. Keep business rules in an appropriate domain or service layer rather than in controllers or persistence code.
+- Make dependencies explicit with constructor injection. Avoid field injection and service-locator patterns.
+- Keep boundaries small and cohesive. Add an abstraction only when it expresses a real domain concept, isolates a meaningful dependency, or removes substantial duplication.
+
+## Data and Validation
+
+- Use request and response DTOs at API boundaries. Do not expose persistence entities as API contracts.
+- Validate untrusted input at the boundary with Jakarta Bean Validation where appropriate, and enforce important invariants in the business layer as well.
+- Use explicit mapping between API models and domain or persistence models. Keep mapping straightforward and avoid generic mapping frameworks unless the project already uses one for good reason.
+
+## Errors and Maintainability
+
+- Translate expected domain and persistence failures into deliberate application errors. Handle HTTP translation centrally rather than duplicating it in controllers.
+- Prefer clear names, focused methods, immutable values where practical, and straightforward control flow. Avoid speculative features, redundant wrappers, and abstractions that obscure behavior.
+- Keep configuration externalized. Avoid hidden mutable global state and catch exceptions only when the code can handle or meaningfully translate them.
+
+## Security
+
+- Apply authentication and authorization according to the approved requirements; enforce access checks on every relevant operation,
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The test strategy requires REST-boundary coverage for every transition, including unchanged persisted status after rejection; it also explicitly permits leaving restart persistence as a manual acceptance check to avoid extra infrastructure. I’m inspecting the current test setup and API mappings now so new cases reuse the existing TestRestTemplate/SpringBootTest convention without modifying production code.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short`
+
+Check existing user and prior-step modifications before touching tests.
+
+```bash
+git status --short
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? src/main/java/com/supportticket/controller/TicketController.java
+?? src/main/java/com/supportticket/service/CommentService.java
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
+
+Read `supportticket`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket`
+
+**Result:**
+
+```
+controller/
+service/
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CommentControllerIntegrationTest.java`
+
+**Input:**
+
+- endLine: `320`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.controller;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import com.supportticket.dto.ApiErrorResponse;
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateCommentRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.entity.Priority;
+import com.supportticket.repository.CommentRepository;
+import com.supportticket.repository.TicketRepository;
+import com.supportticket.service.TicketService;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+		"spring.datasource.url=jdbc:h2:mem:comment-api-test;DB_CLOSE_DELAY=-1",
+		"spring.jpa.hibernate.ddl-auto=create-drop" })
+class CommentControllerIntegrationTest {
+
+	private static final UUID CLIENT_COMMENT_ID = UUID.fromString("7b8e6f40-2e9a-4d1f-bb94-4a1e9a8bb4f2");
+	private static final Instant CLIENT_TIMESTAMP = Instant.parse("2020-01-01T00:00:00Z");
+
+	@LocalServerPort
+	private int port;
+
+	@Autowired
+	private TestRestTemplate restTemplate;
+
+	@Autowired
+	private TicketRepository ticketRepository;
+
+	@Autowired
+	private CommentRepository commentRepository;
+
+	@Autowired
+	private TicketS
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketServiceTest.java`
+
+**Input:**
+
+- endLine: `420`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+
+class TicketServiceTest {
+
+	private static final ValidatorFactory VALIDATOR_FACTORY = Validation.buildDefaultValidatorFactory();
+	private static final Map<TicketStatus, Set<TicketStatus>> VALID_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+	private static final UUID TICKET_ID = UUI
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketController.java`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/controller/TicketController.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.controller;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateCommentRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.service.CommentService;
+import com.supportticket.service.TicketService;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/tickets")
+public class TicketController {
+
+	private final TicketService ticketService;
+	private final CommentService commentService;
+
+	public TicketController(TicketService ticketService, CommentService commentService) {
+		this.ticketService = ticketService;
+		this.commentService = commentService;
+	}
+
+	@PostMapping
+	public ResponseEntity<TicketResponse> createTicket(@RequestBody CreateTicketRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(ticketService.createTicket(request));
+	}
+
+	@GetMapping
+	public List<TicketResponse> listTickets(
+			@RequestParam(name = "keyword", required = false) String keyword,
+			@RequestParam(name = "status", required = false) TicketStatus status) {
+		return ticketService.listTickets(keyword, status
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketService.java`
+
+**Input:**
+
+- endLine: `320`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/TicketService.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Comment;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class TicketService {
+
+	private static final Map<TicketStatus, Set<TicketStatus>> ALLOWED_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public TicketService(TicketRepository ticketRepository, Validator validator) {
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public TicketResponse createTicket(CreateTicketRequest request) {
+		validate(request);
+		Ticket ticket = new Ticket(request.title(), request.description(), request.priority(), request.assignee());
+		ticket.setStatus(TicketStatus.OPEN);
+		return toResponse(ticketRepository.saveAndFlush(ticket));
+	}
+
+	@Transactional(readOnly = true)
+	public TicketResponse getTicketById(UUID ticketId) {
+		return ticketRepository.findById(ticketId)
+				.map(this::toDetailResponse)
+				.orElseThrow(
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `CommentService.java`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/service/CommentService.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.service;
+
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.supportticket.dto.CommentResponse;
+import com.supportticket.dto.CreateCommentRequest;
+import com.supportticket.entity.Comment;
+import com.supportticket.entity.Ticket;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.CommentRepository;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+
+@Service
+public class CommentService {
+
+	private final CommentRepository commentRepository;
+	private final TicketRepository ticketRepository;
+	private final Validator validator;
+
+	public CommentService(CommentRepository commentRepository, TicketRepository ticketRepository,
+			Validator validator) {
+		this.commentRepository = commentRepository;
+		this.ticketRepository = ticketRepository;
+		this.validator = validator;
+	}
+
+	@Transactional
+	public CommentResponse addComment(UUID ticketId, CreateCommentRequest request) {
+		validate(request);
+		Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(TicketNotFoundException::new);
+		Comment comment = commentRepository.saveAndFlush(new Comment(ticket, request.author(), request.content()));
+		return new CommentResponse(
+				comment.getId(),
+				comment.getTicket().getId(),
+				comment.getAuthor(),
+				comment.getContent(),
+				comment.getCreatedAt());
+	}
+
+	private void validate(CreateCommentRequest request) {
+		var violations = validator.validate(request);
+		if (!violations.isEmpty()) {
+			throw new ConstraintViolationException(violations);
+		}
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `TicketRepository.java`
+
+**Input:**
+
+- endLine: `240`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/repository/TicketRepository.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.repository;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+
+public interface TicketRepository extends JpaRepository<Ticket, UUID> {
+
+	List<Ticket> findByStatus(TicketStatus status);
+
+	List<Ticket> findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+			String titleKeyword, String descriptionKeyword);
+
+	List<Ticket> findByStatusAndTitleContainingIgnoreCaseOrStatusAndDescriptionContainingIgnoreCase(
+			TicketStatus titleStatus, String titleKeyword, TicketStatus descriptionStatus, String descriptionKeyword);
+
+	default List<Ticket> findByFilters(String keyword, TicketStatus status) {
+		if (keyword == null || keyword.isBlank()) {
+			return status == null ? findAll() : findByStatus(status);
+		}
+
+		if (status == null) {
+			return findByTitleContainingIgnoreCaseOrDescriptionContainingIgnoreCase(keyword, keyword);
+		}
+
+		return findByStatusAndTitleContainingIgnoreCaseOrStatusAndDescriptionContainingIgnoreCase(
+				status, keyword, status, keyword);
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `ApiExceptionHandler.java`
+
+**Input:**
+
+- endLine: `280`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/src/main/java/com/supportticket/exception/ApiExceptionHandler.java`
+- startLine: `1`
+
+**Result:**
+
+```
+package com.supportticket.exception;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.supportticket.dto.ApiErrorResponse;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.servlet.http.HttpServletRequest;
+
+@RestControllerAdvice
+public class ApiExceptionHandler {
+
+	private static final Logger logger = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+	@ExceptionHandler(BindException.class)
+	public ResponseEntity<ApiErrorResponse> handleValidation(BindException exception,
+			HttpServletRequest request) {
+		Map<String, String> errors = new TreeMap<>();
+		exception.getBindingResult().getFieldErrors().forEach(error ->
+				errors.putIfAbsent(error.getField(), error.getDefaultMessage()));
+		exception.getBindingResult().getGlobalErrors().forEach(error ->
+				errors.putIfAbsent("request", error.getDefaultMessage()));
+		return errorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request validation failed",
+				errors, request);
+	}
+
+	@ExceptionHandler(ConstraintViolationException.class)
+	public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException exception,
+			HttpServletRequest request) {
+		Map<String, String> errors = new TreeMap<>();
+		exception.getConstraintViolations().forEach(violation -> {
+			String propertyPath = violation.getPropertyPath().toString();
+			String field = propertyPath.substring(p
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `pom.xml`
+
+**Input:**
+
+- endLine: `260`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/pom.xml`
+- startLine: `1`
+
+**Result:**
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.5.6</version>
+		<relativePath />
+	</parent>
+
+	<groupId>com.supportticket</groupId>
+	<artifactId>support-ticket-management</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>support-ticket-management</name>
+	<description>Support Ticket Management System backend</description>
+
+	<properties>
+		<java.version>21</java.version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+</project>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The implementation already exposes all required routes, uses service-level validation, and has a separate comment integration suite. I’ll add one isolated-H2 Ticket REST integration class that exercises all five valid and all twenty invalid state pairs through HTTP, plus CRUD/search/error structure checks; I’ll also correct the existing unit test’s “never saved” verification to target , the method the service actually uses.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketControllerIntegrationTest.java**</summary>
+
+@@ lines 1-1 @@
+
+```
+package com.supportticket.controller;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import com.supportticket.dto.ApiErrorResponse;
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.repository.CommentRepository;
+import com.supportticket.repository.TicketRepository;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+		"spring.datasource.url=jdbc:h2:mem:ticket-api-test;DB_CLOSE_DELAY=-1",
+		"spring.jpa.hibernate.ddl-auto=create-drop" })
+class TicketControllerIntegrationTest {
+
+	private static final Set<TicketStatus> OPEN_TRANSITIONS = Set.of(
+			TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED);
+	private static final Set<TicketStatus> IN_PROGRESS_TRANSITIONS = Set.of(
+			TicketStatus.RESOLVED, TicketStatus.CANCELLED);
+	private static final Set<TicketStatus> RESOLVED_TRANSITIONS = Set.of(TicketStatus.CLOSED);
+	private static final UUID CLIENT_TICKET_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+
+	@LocalServerPort
+	private int port;
+
+	@Autowired
+	private TestRestTemplate restTemplate;
+
+	@Autowired
+	private TicketRepository ticketRepository;
+
+	@Autowired
+	private CommentRepository commentRepository;
+
+	@BeforeEach
+	void clearDatabase() {
+		commentRepository.deleteAll();
+		ticketRepository.deleteAll();
+	}
+
+	@Test
+	void createsTicketWithOpenStatusAndServerGeneratedFields() {
+		ResponseEntity<TicketResponse> response = restTemplate.postForEntity(ticketsUrl(),
+				new CreateTicketRequest("Cannot access account", "The sign-in page fails", Priority.HIGH, "Support"),
+				TicketResponse.class);
+
+		assertEquals(HttpStatus.CREATED, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertNotNull(response.getBody().id());
+		assertNotEquals(CLIENT_TICKET_ID, response.getBody().id());
+		assertEquals(TicketStatus.OPEN, response.getBody().status());
+		assertEquals("Cannot access account", response.getBody().title());
+		assertEquals(Priority.HIGH, response.getBody().priority());
+		assertNotNull(response.getBody().createdAt());
+		assertNotNull(response.getBody().updatedAt());
+	}
+
+	@Test
+	void returnsStructuredValidationErrorsForInvalidCreateFields() {
+		assertValidationError("{\"title\":\"\",\"description\":\"Description\",\"priority\":\"LOW\"}", "title");
+		assertValidationError("{\"title\":\"Title\",\"description\":\"\",\"priority\":\"LOW\"}", "description");
+		assertValidationError("{\"title\":\"Title\",\"description\":\"Description\",\"priority\":null}", "priority");
+	}
+
+	@Test
+	void getsExistingTicketAndReturnsStructuredNotFoundForMissingTicket() {
+		UUID ticketId = createTicket("Details title", "Details description", Priority.MEDIUM);
+
+		ResponseEntity<TicketResponse> found = restTemplate.getForEntity(ticketUrl(ticketId), TicketResponse.class);
+		assertEquals(HttpStatus.OK, found.getStatusCode());
+		assertNotNull(found.getBody());
+		assertEquals(ticketId, found.getBody().id());
+		assertEquals("Details title", found.getBody().title());
+		assertNotNull(found.getBody().comments());
+
+		UUID missingId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+		ResponseEntity<ApiErrorResponse> missing = restTemplate.getForEntity(ticketUrl(missingId), ApiErrorResponse.class);
+		assertErrorResponse(missing, HttpStatus.NOT_FOUND, "NOT_FOUND", ticketPath(missingId));
+	}
+
+	@Test
+	void updatesEditableFieldsWithoutChangingStatusAndRejectsStatusInPut() {
+		UUID ticketId = createTicket("Original title", "Original description", Priority.LOW);
+		ResponseEntity<TicketResponse> updated = restTemplate.exchange(ticketUrl(ticketId), HttpMethod.PUT,
+				new HttpEntity<>(new UpdateTicketRequest("Changed title", "Changed description", Priority.CRITICAL,
+						"Account Support")), TicketResponse.class);
+
+		assertEquals(HttpStatus.OK, updated.getStatusCode());
+		assertNotNull(updated.getBody());
+		assertEquals("Changed title", updated.getBody().title());
+		assertEquals("Changed description", updated.getBody().description());
+		assertEquals(Priority.CRITICAL, updated.getBody().priority());
+		assertEquals("Account Support", updated.getBody().assignee());
+		assertEquals(TicketStatus.OPEN, updated.getBody().status());
+
+		ResponseEntity<ApiErrorResponse> forbiddenStatus = putJson(ticketId,
+				"{\"title\":\"Changed title\",\"description\":\"Changed description\","
+						+ "\"priority\":\"CRITICAL\",\"status\":\"CLOSED\"}");
+		assertErrorResponse(forbiddenStatus, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", ticketPath(ticketId));
+		assertEquals(TicketStatus.OPEN, getTicket(ticketId).status());
+	}
+
+	@Test
+	void returnsStructuredValidationErrorsForInvalidUpdate() {
+		UUID ticketId = createTicket("Original title", "Original description", Priority.LOW);
+
+		ResponseEntity<ApiErrorResponse> response = putJson(ticketId,
+				"{\"title\":\"\",\"description\":\"Description\",\"priority\":\"LOW\"}");
+
+		assertErrorResponse(response, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", ticketPath(ticketId));
+		assertTrue(response.getBody().errors().containsKey("title"));
+	}
+
+	@Test
+	void searchesBothFieldsCaseInsensitivelyAndCombinesWithStatus() {
+		UUID titleMatchId = createTicket("Login failure", "Account page is unavailable", Priority.HIGH);
+		UUID descriptionMatchId = createTicket("Network issue", "LOGIN service unavailable", Priority.MEDIUM);
+		UUID unrelatedId = createTicket("Printer issue", "Paper jam", Priority.LOW);
+		changeStatus(descriptionMatchId, TicketStatus.IN_PROGRESS);
+
+		TicketResponse[] keywordMatches = getTickets("?keyword=LOGIN");
+		assertEquals(2, keywordMatches.length);
+		assertTrue(containsTicket(keywordMatches, titleMatchId));
+		assertTrue(containsTicket(keywordMatches, descriptionMatchId));
+		assertFalse(containsTicket(keywordMatches, unrelatedId));
+
+		TicketResponse[] statusMatches = getTickets("?status=IN_PROGRESS");
+		assertEquals(1, statusMatches.length);
+		assertEquals(descriptionMatchId, statusMatches[0].id());
+
+		TicketResponse[] combinedMatches = getTickets("?keyword=login&status=IN_PROGRESS");
+		assertEquals(1, combinedMatches.length);
+		assertEquals(descriptionMatchId, combinedMatches[0].id());
+	}
+
+	@Test
+	void blankKeywordDoesNotFilterTickets() {
+		createTicket("Alpha", "First description", Priority.LOW);
+		createTicket("Beta", "Second description", Priority.MEDIUM);
+		createTicket("Gamma", "Third description", Priority.HIGH);
+
+		assertEquals(3, getTickets("?keyword=%20%20%09").length);
+	}
+
+	@Test
+	void appliesEveryValidStatusTransitionThroughRestAndPersistsIt() {
+		List<TransitionCase> transitions = List.of(
+				new TransitionCase(List.of(), TicketStatus.IN_PROGRESS),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS), TicketStatus.RESOLVED),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED), TicketStatus.CLOSED),
+				new TransitionCase(List.of(), TicketStatus.CANCELLED),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS), TicketStatus.CANCELLED));
+
+		for (TransitionCase transition : transitions) {
+			UUID ticketId = createTicket("Transition ticket", "State machine test", Priority.MEDIUM);
+			for (TicketStatus setupStatus : transition.setupTransitions()) {
+				assertEquals(HttpStatus.OK, patchStatus(ticketId, setupStatus).getStatusCode());
+			}
+
+			ResponseEntity<TicketResponse> changed = patchStatus(ticketId, transition.targetStatus());
+			assertEquals(HttpStatus.OK, changed.getStatusCode());
+			assertNotNull(changed.getBody());
+			assertEquals(transition.targetStatus(), changed.getBody().status());
+			assertEquals(transition.targetStatus(), getTicket(ticketId).status());
+		}
+	}
+
+	@Test
+	void rejectsEveryInvalidTransitionAndKeepsPersistedStatusUnchanged() {
+		for (TicketStatus currentStatus : TicketStatus.values()) {
+			UUID ticketId = createTicket("Invalid transition ticket", "State machine test", Priority.MEDIUM);
+			for (TicketStatus setupStatus : pathTo(currentStatus)) {
+				assertEquals(HttpStatus.OK, patchStatus(ticketId, setupStatus).getStatusCode());
+			}
+
+			for (TicketStatus requestedStatus : TicketStatus.values()) {
+				if (!allowedTransitionsFrom(currentStatus).contains(requestedStatus)) {
+					ResponseEntity<ApiErrorResponse> rejected = patchStatusForError(ticketId, requestedStatus);
+					assertErrorResponse(rejected, HttpStatus.CONFLICT, "INVALID_STATUS_TRANSITION",
+							ticketPath(ticketId) + "/status");
+					assertTrue(rejected.getBody().message().contains(currentStatus.name()));
+					assertTrue(rejected.getBody().message().contains(requestedStatus.name()));
+					assertEquals(currentStatus, getTicket(ticketId).status());
+				}
+			}
+		}
+	}
+
+	private void assertValidationError(String requestBody, String field) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		ResponseEntity<ApiErrorResponse> response = restTemplate.exchange(ticketsUrl(), HttpMethod.POST,
+				new HttpEntity<>(requestBody, headers), ApiErrorResponse.class);
+		assertErrorResponse(response, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "/api/tickets");
+		assertTrue(response.getBody().errors().containsKey(field));
+	}
+
+	private ResponseEntity<ApiErrorResponse> putJson(UUID ticketId, String requestBody) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		return restTemplate.exchange(ticketUrl(ticketId), HttpMethod.PUT, new HttpEntity<>(requestBody, headers),
+				ApiErrorResponse.class);
+	}
+
+	private ResponseEntity<TicketResponse> patchStatus(UUID ticketId, TicketStatus status) {
+		return restTemplate.exchange(statusUrl(ticketId), HttpMethod.PATCH,
+				new HttpEntity<>(new ChangeTicketStatusRequest(status)), TicketResponse.class);
+	}
+
+	private ResponseEntity<ApiErrorResponse> patchStatusForError(UUID ticketId, TicketStatus status) {
+		return restTemplate.exchange(statusUrl(ticketId), HttpMethod.PATCH,
+				new HttpEntity<>(new ChangeTicketStatusRequest(status)), ApiErrorResponse.class);
+	}
+
+	private UUID createTicket(String title, String description, Priority priority) {
+		ResponseEntity<TicketResponse> response = restTemplate.postForEntity(ticketsUrl(),
+				new CreateTicketRequest(title, description, priority, null), TicketResponse.class);
+		assertEquals(HttpStatus.CREATED, response.getStatusCode());
+		return response.getBody().id();
+	}
+
+	private void changeStatus(UUID ticketId, TicketStatus status) {
+		assertEquals(HttpStatus.OK, patchStatus(ticketId, status).getStatusCode());
+	}
+
+	private TicketResponse getTicket(UUID ticketId) {
+		return restTemplate.getForObject(ticketUrl(ticketId), TicketResponse.class);
+	}
+
+	private TicketResponse[] getTickets(String query) {
+		return restTemplate.getForObject(ticketsUrl() + query, TicketResponse[].class);
+	}
+
+	private boolean containsTicket(TicketResponse[] tickets, UUID ticketId) {
+		return Arrays.stream(tickets).anyMatch(ticket -> ticket.id().equals(ticketId));
+	}
+
+	private void assertErrorResponse(ResponseEntity<ApiErrorResponse> response, HttpStatus status,
+			String code, String path) {
+		assertEquals(status, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertNotNull(response.getBody().timestamp());
+		assertEquals(status.value(), response.getBody().status());
+		assertEquals(code, response.getBody().code());
+		assertFalse(response.getBody().message().isBlank());
+		assertEquals(path, response.getBody().path());
+	}
+
+	private String ticketsUrl() {
+		return "http://localhost:" + port + "/api/tickets";
+	}
+
+	private String ticketUrl(UUID ticketId) {
+		return ticketPath(ticketId);
+	}
+
+	private String statusUrl(UUID ticketId) {
+		return ticketUrl(ticketId) + "/status";
+	}
+
+	private String ticketPath(UUID ticketId) {
+		return "/api/tickets/" + ticketId;
+	}
+
+	private List<TicketStatus> pathTo(TicketStatus status) {
+		return switch (status) {
+			case OPEN -> List.of();
+			case IN_PROGRESS -> List.of(TicketStatus.IN_PROGRESS);
+			case RESOLVED -> List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED);
+			case CLOSED -> List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.CLOSED);
+			case CANCELLED -> List.of(TicketStatus.CANCELLED);
+		};
+	}
+
+	private Set<TicketStatus> allowedTransitionsFrom(TicketStatus status) {
+		return switch (status) {
+			case OPEN -> OPEN_TRANSITIONS;
+			case IN_PROGRESS -> IN_PROGRESS_TRANSITIONS;
+			case RESOLVED -> RESOLVED_TRANSITIONS;
+			case CLOSED, CANCELLED -> Set.of();
+		};
+	}
+
+	private record TransitionCase(List<TicketStatus> setupTransitions, TicketStatus targetStatus) {
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketServiceTest.java**</summary>
+
+@@ lines 1-185 @@
+
+```
+package com.supportticket.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Stream;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.Ticket;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.exception.InvalidStatusTransitionException;
+import com.supportticket.exception.TicketNotFoundException;
+import com.supportticket.repository.TicketRepository;
+
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+
+class TicketServiceTest {
+
+	private static final ValidatorFactory VALIDATOR_FACTORY = Validation.buildDefaultValidatorFactory();
+	private static final Map<TicketStatus, Set<TicketStatus>> VALID_TRANSITIONS = Map.of(
+			TicketStatus.OPEN, Set.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+			TicketStatus.IN_PROGRESS, Set.of(TicketStatus.RESOLVED, TicketStatus.CANCELLED),
+			TicketStatus.RESOLVED, Set.of(TicketStatus.CLOSED),
+			TicketStatus.CLOSED, Set.of(),
+			TicketStatus.CANCELLED, Set.of());
+	private static final UUID TICKET_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+
+	private TicketRepository ticketRepository;
+	private TicketService ticketService;
+
+	@BeforeEach
+	void setUp() {
+		ticketRepository = mock(TicketRepository.class);
+		ticketService = new TicketService(ticketRepository, VALIDATOR_FACTORY.getValidator());
+	}
+
+	@AfterAll
+	static void closeValidatorFactory() {
+		VALIDATOR_FACTORY.close();
+	}
+
+	@Test
+	void createsTicketWithOpenStatusAndApprovedFields() {
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		TicketResponse response = ticketService.createTicket(
+				new CreateTicketRequest("Login issue", "Cannot sign in", Priority.HIGH, "Support"));
+
+		verify(ticketRepository).saveAndFlush(any(Ticket.class));
+		assertEquals(TicketStatus.OPEN, response.status());
+		assertEquals("Login issue", response.title());
+		assertEquals("Cannot sign in", response.description());
+		assertEquals(Priority.HIGH, response.priority());
+		assertEquals("Support", response.assignee());
+	}
+
+	@Test
+	void rejectsInvalidCreateRequestBeforeSaving() {
+		assertThrows(ConstraintViolationException.class, () -> ticketService.createTicket(
+				new CreateTicketRequest("", "A description", null, null)));
+
+		verify(ticketRepository, never()).saveAndFlush(any(Ticket.class));
+	}
+
+	@Test
+	void getsTicketByIdOrThrowsWhenMissing() {
+		Ticket ticket = ticketWithStatus(TicketStatus.OPEN);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+
+		assertEquals(TicketStatus.OPEN, ticketService.getTicketById(TICKET_ID).status());
+
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
+		assertThrows(TicketNotFoundException.class, () -> ticketService.getTicketById(TICKET_ID));
+	}
+
+	@Test
+	void delegatesKeywordAndStatusFiltersToRepository() {
+		when(ticketRepository.findByFilters(" \t ", TicketStatus.OPEN)).thenReturn(java.util.List.of());
+
+		assertEquals(java.util.List.of(), ticketService.listTickets(" \t ", TicketStatus.OPEN));
+
+		verify(ticketRepository).findByFilters(" \t ", TicketStatus.OPEN);
+	}
+
+	@Test
+	void updatesOnlyEditableTicketFields() {
+		Ticket ticket = ticketWithStatus(TicketStatus.IN_PROGRESS);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		TicketResponse response = ticketService.updateTicket(TICKET_ID,
+				new UpdateTicketRequest("Updated title", "Updated description", Priority.CRITICAL, null));
+
+		assertEquals("Updated title", ticket.getTitle());
+		assertEquals("Updated description", ticket.getDescription());
+		assertEquals(Priority.CRITICAL, ticket.getPriority());
+		assertNull(ticket.getAssignee());
+		assertEquals(TicketStatus.IN_PROGRESS, ticket.getStatus());
+		assertEquals(TicketStatus.IN_PROGRESS, response.status());
+		verify(ticketRepository).saveAndFlush(ticket);
+	}
+
+	@Test
+	void updateOfMissingTicketThrowsNotFoundWithoutSaving() {
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.empty());
+
+		assertThrows(TicketNotFoundException.class, () -> ticketService.updateTicket(TICKET_ID,
+				new UpdateTicketRequest("Title", "Description", Priority.LOW, null)));
+
+		verify(ticketRepository, never()).saveAndFlush(any(Ticket.class));
+	}
+
+	@ParameterizedTest
+	@MethodSource("validTransitions")
+	void appliesEveryAllowedStatusTransition(TicketStatus currentStatus, TicketStatus requestedStatus) {
+		Ticket ticket = ticketWithStatus(currentStatus);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+		when(ticketRepository.saveAndFlush(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		assertEquals(requestedStatus, ticketService.changeTicketStatus(TICKET_ID, requestedStatus).status());
+		verify(ticketRepository).saveAndFlush(ticket);
+	}
+
+	@ParameterizedTest
+	@MethodSource("invalidTransitions")
+	void rejectsEveryOtherTransitionWithoutChangingOrSaving(TicketStatus currentStatus,
+			TicketStatus requestedStatus) {
+		Ticket ticket = ticketWithStatus(currentStatus);
+		when(ticketRepository.findById(TICKET_ID)).thenReturn(Optional.of(ticket));
+
+		InvalidStatusTransitionException exception = assertThrows(InvalidStatusTransitionException.class,
+				() -> ticketService.changeTicketStatus(TICKET_ID, requestedStatus));
+
+		assertEquals(currentStatus, ticket.getStatus());
+		assertEquals("Ticket cannot transition from " + currentStatus + " to " + requestedStatus,
+				exception.getMessage());
+		verify(ticketRepository, never()).save(any(Ticket.class));
+	}
+
+	private static Stream<Arguments> validTransitions() {
+		return Stream.of(
+				Arguments.of(TicketStatus.OPEN, TicketStatus.IN_PROGRESS),
+				Arguments.of(TicketStatus.OPEN, TicketStatus.CANCELLED),
+				Arguments.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED),
+				Arguments.of(TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED),
+				Arguments.of(TicketStatus.RESOLVED, TicketStatus.CLOSED));
+	}
+
+	private static Stream<Arguments> invalidTransitions() {
+		return Arrays.stream(TicketStatus.values())
+				.flatMap(currentStatus -> Arrays.stream(TicketStatus.values())
+						.filter(requestedStatus -> !VALID_TRANSITIONS.get(currentStatus).contains(requestedStatus))
+						.map(requestedStatus -> Arguments.of(currentStatus, requestedStatus)));
+	}
+
+	private Ticket ticketWithStatus(TicketStatus status) {
+		Ticket ticket = new Ticket("Original title", "Original description", Priority.MEDIUM, "Original assignee");
+		ticket.setStatus(status);
+		return ticket;
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The ticket integration class now covers the requested API behaviors and exhaustively checks all 20 invalid state pairs via PATCH followed by GET. I also fixed the two unit-test “no save” verifications to assert against ; I’m attempting the full Maven suite now, then I’ll fall back to the cached Java/Spring test runner if Maven is still unavailable.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` mvn test`
+
+Run the complete backend test suite after adding Ticket REST integration tests.
+
+```bash
+mvn test
+```
+
+**Result:**
+
+```
+Command 'mvn' not found, but can be installed with:
+sudo apt install maven
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The full build command is blocked because Maven is not installed. I’m compiling every production and test source with Java 21 and running editor diagnostics; once compilation passes, I’ll execute both integration classes via Spring TestContext so the REST requests and H2 persistence are exercised despite the missing Maven runner.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` mkdir -p /tmp/c2jir-ticket-step15-classes /tmp/c2jir-ticket-step15-test-clas...`
+
+Compile the entire production and test tree with Java 21 using cached dependencies.
+
+```bash
+mkdir -p /tmp/c2jir-ticket-step15-classes /tmp/c2jir-ticket-step15-test-classes && dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step15-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step15-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step15-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.java:
+75: error: cannot find symbol
+                assertNotEquals(CLIENT_TICKET_ID, response.getBody().id());
+                ^
+  symbol:   method assertNotEquals(UUID,UUID)
+  location: class TicketControllerIntegrationTest
+1 error
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `TicketControllerIntegrationTest.java`, `TicketServiceTest.java`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Compilation caught a test-only omission: the new integration test uses  but didn’t import it. I’m adding that static import and rerunning the same full-source compilation before executing tests.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketControllerIntegrationTest.java**</summary>
+
+@@ lines 1-313 @@
+
+```
+package com.supportticket.controller;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import com.supportticket.dto.ApiErrorResponse;
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.repository.CommentRepository;
+import com.supportticket.repository.TicketRepository;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+		"spring.datasource.url=jdbc:h2:mem:ticket-api-test;DB_CLOSE_DELAY=-1",
+		"spring.jpa.hibernate.ddl-auto=create-drop" })
+class TicketControllerIntegrationTest {
+
+	private static final Set<TicketStatus> OPEN_TRANSITIONS = Set.of(
+			TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED);
+	private static final Set<TicketStatus> IN_PROGRESS_TRANSITIONS = Set.of(
+			TicketStatus.RESOLVED, TicketStatus.CANCELLED);
+	private static final Set<TicketStatus> RESOLVED_TRANSITIONS = Set.of(TicketStatus.CLOSED);
+	private static final UUID CLIENT_TICKET_ID = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+
+	@LocalServerPort
+	private int port;
+
+	@Autowired
+	private TestRestTemplate restTemplate;
+
+	@Autowired
+	private TicketRepository ticketRepository;
+
+	@Autowired
+	private CommentRepository commentRepository;
+
+	@BeforeEach
+	void clearDatabase() {
+		commentRepository.deleteAll();
+		ticketRepository.deleteAll();
+	}
+
+	@Test
+	void createsTicketWithOpenStatusAndServerGeneratedFields() {
+		ResponseEntity<TicketResponse> response = restTemplate.postForEntity(ticketsUrl(),
+				new CreateTicketRequest("Cannot access account", "The sign-in page fails", Priority.HIGH, "Support"),
+				TicketResponse.class);
+
+		assertEquals(HttpStatus.CREATED, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertNotNull(response.getBody().id());
+		assertNotEquals(CLIENT_TICKET_ID, response.getBody().id());
+		assertEquals(TicketStatus.OPEN, response.getBody().status());
+		assertEquals("Cannot access account", response.getBody().title());
+		assertEquals(Priority.HIGH, response.getBody().priority());
+		assertNotNull(response.getBody().createdAt());
+		assertNotNull(response.getBody().updatedAt());
+	}
+
+	@Test
+	void returnsStructuredValidationErrorsForInvalidCreateFields() {
+		assertValidationError("{\"title\":\"\",\"description\":\"Description\",\"priority\":\"LOW\"}", "title");
+		assertValidationError("{\"title\":\"Title\",\"description\":\"\",\"priority\":\"LOW\"}", "description");
+		assertValidationError("{\"title\":\"Title\",\"description\":\"Description\",\"priority\":null}", "priority");
+	}
+
+	@Test
+	void getsExistingTicketAndReturnsStructuredNotFoundForMissingTicket() {
+		UUID ticketId = createTicket("Details title", "Details description", Priority.MEDIUM);
+
+		ResponseEntity<TicketResponse> found = restTemplate.getForEntity(ticketUrl(ticketId), TicketResponse.class);
+		assertEquals(HttpStatus.OK, found.getStatusCode());
+		assertNotNull(found.getBody());
+		assertEquals(ticketId, found.getBody().id());
+		assertEquals("Details title", found.getBody().title());
+		assertNotNull(found.getBody().comments());
+
+		UUID missingId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+		ResponseEntity<ApiErrorResponse> missing = restTemplate.getForEntity(ticketUrl(missingId), ApiErrorResponse.class);
+		assertErrorResponse(missing, HttpStatus.NOT_FOUND, "NOT_FOUND", ticketPath(missingId));
+	}
+
+	@Test
+	void updatesEditableFieldsWithoutChangingStatusAndRejectsStatusInPut() {
+		UUID ticketId = createTicket("Original title", "Original description", Priority.LOW);
+		ResponseEntity<TicketResponse> updated = restTemplate.exchange(ticketUrl(ticketId), HttpMethod.PUT,
+				new HttpEntity<>(new UpdateTicketRequest("Changed title", "Changed description", Priority.CRITICAL,
+						"Account Support")), TicketResponse.class);
+
+		assertEquals(HttpStatus.OK, updated.getStatusCode());
+		assertNotNull(updated.getBody());
+		assertEquals("Changed title", updated.getBody().title());
+		assertEquals("Changed description", updated.getBody().description());
+		assertEquals(Priority.CRITICAL, updated.getBody().priority());
+		assertEquals("Account Support", updated.getBody().assignee());
+		assertEquals(TicketStatus.OPEN, updated.getBody().status());
+
+		ResponseEntity<ApiErrorResponse> forbiddenStatus = putJson(ticketId,
+				"{\"title\":\"Changed title\",\"description\":\"Changed description\","
+						+ "\"priority\":\"CRITICAL\",\"status\":\"CLOSED\"}");
+		assertErrorResponse(forbiddenStatus, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", ticketPath(ticketId));
+		assertEquals(TicketStatus.OPEN, getTicket(ticketId).status());
+	}
+
+	@Test
+	void returnsStructuredValidationErrorsForInvalidUpdate() {
+		UUID ticketId = createTicket("Original title", "Original description", Priority.LOW);
+
+		ResponseEntity<ApiErrorResponse> response = putJson(ticketId,
+				"{\"title\":\"\",\"description\":\"Description\",\"priority\":\"LOW\"}");
+
+		assertErrorResponse(response, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", ticketPath(ticketId));
+		assertTrue(response.getBody().errors().containsKey("title"));
+	}
+
+	@Test
+	void searchesBothFieldsCaseInsensitivelyAndCombinesWithStatus() {
+		UUID titleMatchId = createTicket("Login failure", "Account page is unavailable", Priority.HIGH);
+		UUID descriptionMatchId = createTicket("Network issue", "LOGIN service unavailable", Priority.MEDIUM);
+		UUID unrelatedId = createTicket("Printer issue", "Paper jam", Priority.LOW);
+		changeStatus(descriptionMatchId, TicketStatus.IN_PROGRESS);
+
+		TicketResponse[] keywordMatches = getTickets("?keyword=LOGIN");
+		assertEquals(2, keywordMatches.length);
+		assertTrue(containsTicket(keywordMatches, titleMatchId));
+		assertTrue(containsTicket(keywordMatches, descriptionMatchId));
+		assertFalse(containsTicket(keywordMatches, unrelatedId));
+
+		TicketResponse[] statusMatches = getTickets("?status=IN_PROGRESS");
+		assertEquals(1, statusMatches.length);
+		assertEquals(descriptionMatchId, statusMatches[0].id());
+
+		TicketResponse[] combinedMatches = getTickets("?keyword=login&status=IN_PROGRESS");
+		assertEquals(1, combinedMatches.length);
+		assertEquals(descriptionMatchId, combinedMatches[0].id());
+	}
+
+	@Test
+	void blankKeywordDoesNotFilterTickets() {
+		createTicket("Alpha", "First description", Priority.LOW);
+		createTicket("Beta", "Second description", Priority.MEDIUM);
+		createTicket("Gamma", "Third description", Priority.HIGH);
+
+		assertEquals(3, getTickets("?keyword=%20%20%09").length);
+	}
+
+	@Test
+	void appliesEveryValidStatusTransitionThroughRestAndPersistsIt() {
+		List<TransitionCase> transitions = List.of(
+				new TransitionCase(List.of(), TicketStatus.IN_PROGRESS),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS), TicketStatus.RESOLVED),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED), TicketStatus.CLOSED),
+				new TransitionCase(List.of(), TicketStatus.CANCELLED),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS), TicketStatus.CANCELLED));
+
+		for (TransitionCase transition : transitions) {
+			UUID ticketId = createTicket("Transition ticket", "State machine test", Priority.MEDIUM);
+			for (TicketStatus setupStatus : transition.setupTransitions()) {
+				assertEquals(HttpStatus.OK, patchStatus(ticketId, setupStatus).getStatusCode());
+			}
+
+			ResponseEntity<TicketResponse> changed = patchStatus(ticketId, transition.targetStatus());
+			assertEquals(HttpStatus.OK, changed.getStatusCode());
+			assertNotNull(changed.getBody());
+			assertEquals(transition.targetStatus(), changed.getBody().status());
+			assertEquals(transition.targetStatus(), getTicket(ticketId).status());
+		}
+	}
+
+	@Test
+	void rejectsEveryInvalidTransitionAndKeepsPersistedStatusUnchanged() {
+		for (TicketStatus currentStatus : TicketStatus.values()) {
+			UUID ticketId = createTicket("Invalid transition ticket", "State machine test", Priority.MEDIUM);
+			for (TicketStatus setupStatus : pathTo(currentStatus)) {
+				assertEquals(HttpStatus.OK, patchStatus(ticketId, setupStatus).getStatusCode());
+			}
+
+			for (TicketStatus requestedStatus : TicketStatus.values()) {
+				if (!allowedTransitionsFrom(currentStatus).contains(requestedStatus)) {
+					ResponseEntity<ApiErrorResponse> rejected = patchStatusForError(ticketId, requestedStatus);
+					assertErrorResponse(rejected, HttpStatus.CONFLICT, "INVALID_STATUS_TRANSITION",
+							ticketPath(ticketId) + "/status");
+					assertTrue(rejected.getBody().message().contains(currentStatus.name()));
+					assertTrue(rejected.getBody().message().contains(requestedStatus.name()));
+					assertEquals(currentStatus, getTicket(ticketId).status());
+				}
+			}
+		}
+	}
+
+	private void assertValidationError(String requestBody, String field) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		ResponseEntity<ApiErrorResponse> response = restTemplate.exchange(ticketsUrl(), HttpMethod.POST,
+				new HttpEntity<>(requestBody, headers), ApiErrorResponse.class);
+		assertErrorResponse(response, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "/api/tickets");
+		assertTrue(response.getBody().errors().containsKey(field));
+	}
+
+	private ResponseEntity<ApiErrorResponse> putJson(UUID ticketId, String requestBody) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		return restTemplate.exchange(ticketUrl(ticketId), HttpMethod.PUT, new HttpEntity<>(requestBody, headers),
+				ApiErrorResponse.class);
+	}
+
+	private ResponseEntity<TicketResponse> patchStatus(UUID ticketId, TicketStatus status) {
+		return restTemplate.exchange(statusUrl(ticketId), HttpMethod.PATCH,
+				new HttpEntity<>(new ChangeTicketStatusRequest(status)), TicketResponse.class);
+	}
+
+	private ResponseEntity<ApiErrorResponse> patchStatusForError(UUID ticketId, TicketStatus status) {
+		return restTemplate.exchange(statusUrl(ticketId), HttpMethod.PATCH,
+				new HttpEntity<>(new ChangeTicketStatusRequest(status)), ApiErrorResponse.class);
+	}
+
+	private UUID createTicket(String title, String description, Priority priority) {
+		ResponseEntity<TicketResponse> response = restTemplate.postForEntity(ticketsUrl(),
+				new CreateTicketRequest(title, description, priority, null), TicketResponse.class);
+		assertEquals(HttpStatus.CREATED, response.getStatusCode());
+		return response.getBody().id();
+	}
+
+	private void changeStatus(UUID ticketId, TicketStatus status) {
+		assertEquals(HttpStatus.OK, patchStatus(ticketId, status).getStatusCode());
+	}
+
+	private TicketResponse getTicket(UUID ticketId) {
+		return restTemplate.getForObject(ticketUrl(ticketId), TicketResponse.class);
+	}
+
+	private TicketResponse[] getTickets(String query) {
+		return restTemplate.getForObject(ticketsUrl() + query, TicketResponse[].class);
+	}
+
+	private boolean containsTicket(TicketResponse[] tickets, UUID ticketId) {
+		return Arrays.stream(tickets).anyMatch(ticket -> ticket.id().equals(ticketId));
+	}
+
+	private void assertErrorResponse(ResponseEntity<ApiErrorResponse> response, HttpStatus status,
+			String code, String path) {
+		assertEquals(status, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertNotNull(response.getBody().timestamp());
+		assertEquals(status.value(), response.getBody().status());
+		assertEquals(code, response.getBody().code());
+		assertFalse(response.getBody().message().isBlank());
+		assertEquals(path, response.getBody().path());
+	}
+
+	private String ticketsUrl() {
+		return "http://localhost:" + port + "/api/tickets";
+	}
+
+	private String ticketUrl(UUID ticketId) {
+		return ticketPath(ticketId);
+	}
+
+	private String statusUrl(UUID ticketId) {
+		return ticketUrl(ticketId) + "/status";
+	}
+
+	private String ticketPath(UUID ticketId) {
+		return "/api/tickets/" + ticketId;
+	}
+
+	private List<TicketStatus> pathTo(TicketStatus status) {
+		return switch (status) {
+			case OPEN -> List.of();
+			case IN_PROGRESS -> List.of(TicketStatus.IN_PROGRESS);
+			case RESOLVED -> List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED);
+			case CLOSED -> List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.CLOSED);
+			case CANCELLED -> List.of(TicketStatus.CANCELLED);
+		};
+	}
+
+	private Set<TicketStatus> allowedTransitionsFrom(TicketStatus status) {
+		return switch (status) {
+			case OPEN -> OPEN_TRANSITIONS;
+			case IN_PROGRESS -> IN_PROGRESS_TRANSITIONS;
+			case RESOLVED -> RESOLVED_TRANSITIONS;
+			case CLOSED, CANCELLED -> Set.of();
+		};
+	}
+
+	private record TransitionCase(List<TicketStatus> setupTransitions, TicketStatus targetStatus) {
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Recompile all production and test sources after fixing the missing test assertion import.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step15-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step15-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step15-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step15-classes $(find src/main/java -name '*.java') && java
+c --release 21 -cp "/tmp/c2jir-ticket-step15-classes:$dependency_classpath" -d /
+tmp/c2jir-ticket-step15-test-classes $(find src/test/java -name '*.java')
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+All sources now compile. Next I’m executing the new Ticket API integration class through Spring TestContext; it will start the real web application on a random port, run the REST CRUD/search checks, then PATCH every valid and invalid transition against the isolated H2 database.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Run all nine Ticket REST integration methods using Spring TestContext and the existing real HTTP test setup.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-classes:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControllerIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPresent(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : testClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(true); try { method.invoke(instance); manager.afterTestMethod(instance, method, null); passed++; System.out.println("PASS " + method.getName()); } catch (InvocationTargetException exception) { manager.afterTestMethod(instance, method, exception.getCause()); manager.afterTestClass(); throw new RuntimeException(exception.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases");
+if (passed != 9) System.exit(1);
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-c
+lasses:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControlle
+rIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases"
+);
+EOFitassed != 9) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.TicketC
+ontrollerIntegrationTest")testClass ==> class com.supportticket.controller.Ticke
+tControllerIntegrationTest
+
+jshell> var manage
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `content.txt`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_GrZ6ycSI2P2ASAzmjWXjdYMK__vscode-1790509702695/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-c
+lasses:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControlle
+rIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases"
+);
+EOFitassed != 9) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.TicketC
+ontrollerIntegrationTest")testClass ==> class com.supportticket.controller.Ticke
+tControllerIntegrationTest
+
+jshell> var manage
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The first six API tests passed; the blank-keyword test failed because  was double-encoding the literal `%20` query text, so the server received a nonblank keyword and returned no matches. This is a test URI construction issue, not yet evidence of a production defect; I’m switching that case to an explicitly encoded `URI` carrying actual whitespace, then rerunning the same integration suite.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Compile the URI construction fix and all current application/test sources.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step15-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step15-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step15-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step15-classes $(find src/main/java -name '*.java') && java
+c --release 21 -cp "/tmp/c2jir-ticket-step15-classes:$dependency_classpath" -d /
+tmp/c2jir-ticket-step15-test-classes $(find src/test/java -name '*.java')
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Rerun all Ticket REST integration methods after fixing the whitespace query encoding, including exhaustive state-machine coverage.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-classes:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControllerIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPresent(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : testClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(true); try { method.invoke(instance); manager.afterTestMethod(instance, method, null); passed++; System.out.println("PASS " + method.getName()); } catch (InvocationTargetException exception) { manager.afterTestMethod(instance, method, exception.getCause()); manager.afterTestClass(); throw new RuntimeException(exception.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases");
+if (passed != 9) System.exit(1);
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-c
+lasses:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControlle
+rIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases"
+);
+EOFitassed != 9) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.TicketC
+ontrollerIntegrationTest")testClass ==> class com.supportticket.controller.Ticke
+tControllerIntegrationTest
+
+jshell> var manage
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `content.txt`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_USoH5hXIBQzIHptyyNuMPQOU__vscode-1790509702699/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-c
+lasses:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControlle
+rIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases"
+);
+EOFitassed != 9) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.TicketC
+ontrollerIntegrationTest")testClass ==> class com.supportticket.controller.Ticke
+tControllerIntegrationTest
+
+jshell> var manage
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The corrected Ticket REST suite passes all nine test methods. Its state-machine loop covers all five allowed transitions and all twenty other current/requested status pairs, asserting every rejection is 409 and followed by a GET proving persisted status unchanged; I’m running the existing comment integration and service unit tests next.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Run all existing comment API integration tests through Spring TestContext against their isolated H2 database.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-classes:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.CommentControllerIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPresent(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : testClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(true); try { method.invoke(instance); manager.afterTestMethod(instance, method, null); passed++; System.out.println("PASS " + method.getName()); } catch (InvocationTargetException exception) { manager.afterTestMethod(instance, method, exception.getCause()); manager.afterTestClass(); throw new RuntimeException(exception.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " CommentControllerIntegrationTest cases");
+if (passed != 4) System.exit(1);
+/exit
+EOF
+```
+
+**Result:**
+
+```
+in)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' !
+ -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/
+lasses:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'ndency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.CommentControll
+erIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " CommentControllerIntegrationTest cases
+");
+EOFitassed != 4) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.Comment
+ControllerIntegrationTest")testClass ==> class com.supportticket.controller.Comm
+entControllerIntegrationTest
+
+jshell> var manager = new TestContextManager(testClass)18:06:29.510 [m
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `content.txt`
+
+**Input:**
+
+- endLine: `260`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_R93TjVGTzTqBXblutlnaFFqX__vscode-1790509702701/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+in)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' !
+ -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/
+lasses:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'ndency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.CommentControll
+erIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " CommentControllerIntegrationTest cases
+");
+EOFitassed != 4) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.Comment
+ControllerIntegrationTest")testClass ==> class com.supportticket.controller.Comm
+entControllerIntegrationTest
+
+jshell> var manager = new TestContextManager(testClass)18:06:29.510 [m
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Run existing service tests directly, including the updated saveAndFlush non-persistence assertions and all valid/invalid transition cases.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-classes:/tmp/c2jir-ticket-step15-test-classes:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.stream.*;
+import org.junit.jupiter.params.provider.Arguments;
+Class<?> testClass = Class.forName("com.supportticket.service.TicketServiceTest");
+Constructor<?> constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(true);
+Method setup = testClass.getDeclaredMethod("setUp"); setup.setAccessible(true);
+void invokeTest(Class<?> type, Constructor<?> ctor, Method before, String name, Object... args) throws Exception { var instance = ctor.newInstance(); before.invoke(instance); var method = Arrays.stream(type.getDeclaredMethods()).filter(candidate -> candidate.getName().equals(name)).findFirst().orElseThrow(); method.setAccessible(true); try { method.invoke(instance, args); } catch (InvocationTargetException exception) { throw new RuntimeException(exception.getCause()); } }
+int runCount = 0;
+for (var name : List.of("createsTicketWithOpenStatusAndApprovedFields", "rejectsInvalidCreateRequestBeforeSaving", "getsTicketByIdOrThrowsWhenMissing", "delegatesKeywordAndStatusFiltersToRepository", "updatesOnlyEditableTicketFields", "updateOfMissingTicketThrowsNotFoundWithoutSaving")) { invokeTest(testClass, constructor, setup, name); runCount++; }
+for (var sourceName : List.of("validTransitions", "invalidTransitions")) { var source = testClass.getDeclaredMethod(sourceName); source.setAccessible(true); var arguments = (Stream<Arguments>) source.invoke(null); var testName = sourceName.equals("validTransitions") ? "appliesEveryAllowedStatusTransition" : "rejectsEveryOtherTransitionWithoutChangingOrSaving"; for (var argument : arguments.toList()) { invokeTest(testClass, constructor, setup, testName, argument.get()); runCount++; } }
+var closeFactory = testClass.getDeclaredMethod("closeValidatorFactory"); closeFactory.setAccessible(true); closeFactory.invoke(null);
+System.out.println("Passed " + runCount + " TicketServiceTest invocations");
+if (runCount != 31) System.exit(1);
+/exit
+EOF
+```
+
+**Result:**
+
+```
+in)$  dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' !
+ -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/
+tmp/c2jir-ticket-step15-classes:/tmp/c2jir-ticket-step15-test-classes:$dependenc
+y_classpath" <<'EOF'
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.stream.*;
+import org.junit.jupiter.params.provider.Arguments;
+Class<?> testClass = Class.forName("com.supportticket.service.TicketServiceTest"
+);
+Constructor<?> constructor = testClass.getDeclaredConstructor(); constructor.set
+Accessible(true);
+Method setup = testClass.getDeclaredMethod("setUp"); setup.setAccessible(true);
+void invokeTest(Class<?> type, Constructor<?> ctor, Method before, String name,
+Object... args) throws Exception { var instance = ctor.newInstance(); before.inv
+oke(instance); var method = Arrays.stream(type.getDeclaredMethods()).filter(cand
+idate -> candidate.getName().equals(name)).findFirst().orElseThrow(); method.set
+Accessible(true); try { method.invoke(instance, args); } catch (InvocationTarget
+Exception exception) { throw new RuntimeException(exception.getCause()); } }
+int runCount = 0;
+for (var name : List.of("createsTicketWithOpenStatusAndApprovedFields", "rejects
+InvalidCreateRequestBeforeSaving", "getsTicketByIdOrThrowsWhenMissing", "delegat
+esKeywordAndStatusFiltersToRepository", "updatesOnlyEditableTicketFields", "upda
+teOfMissingTicketThrowsNotFoundWithoutSaving")) { invokeTest(testClass, construc
+tor, setup, name); runCount++; }
+for (var sourceName : List.of("validTransitions", "invalidTransitions")) { var s
+ource = testClass.getDeclaredMethod(sourceName); source.setAccessible(true); var
+ arguments = (Stream<Arguments>) source.invoke(null); var testName = sourceName.
+equals("validTransitions") ? "appliesEveryAllowedStatusTransition" : "rejectsEve
+ryOtherTransitionWithoutChangingOrSaving"; for (var argument : arguments.toList(
+)) { invokeTest(testClass, constructor, setup, testName, argument.get()); runCou
+EOFi
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The existing Comment integration tests passed all four cases, and all 31 service-test invocations passed. Before finalizing, I’m tightening the Ticket creation test to cover oversized title/description and an unrecognized priority value from the test strategy, and removing a probabilistic UUID inequality check so the suite stays deterministic.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketControllerIntegrationTest.java**</summary>
+
+@@ lines 1-325 @@
+
+```
+package com.supportticket.controller;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.net.URI;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.supportticket.dto.ApiErrorResponse;
+import com.supportticket.dto.ChangeTicketStatusRequest;
+import com.supportticket.dto.CreateTicketRequest;
+import com.supportticket.dto.TicketResponse;
+import com.supportticket.dto.UpdateTicketRequest;
+import com.supportticket.entity.Priority;
+import com.supportticket.entity.TicketStatus;
+import com.supportticket.repository.CommentRepository;
+import com.supportticket.repository.TicketRepository;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+		"spring.datasource.url=jdbc:h2:mem:ticket-api-test;DB_CLOSE_DELAY=-1",
+		"spring.jpa.hibernate.ddl-auto=create-drop" })
+class TicketControllerIntegrationTest {
+
+	private static final Set<TicketStatus> OPEN_TRANSITIONS = Set.of(
+			TicketStatus.IN_PROGRESS, TicketStatus.CANCELLED);
+	private static final Set<TicketStatus> IN_PROGRESS_TRANSITIONS = Set.of(
+			TicketStatus.RESOLVED, TicketStatus.CANCELLED);
+	private static final Set<TicketStatus> RESOLVED_TRANSITIONS = Set.of(TicketStatus.CLOSED);
+
+	@LocalServerPort
+	private int port;
+
+	@Autowired
+	private TestRestTemplate restTemplate;
+
+	@Autowired
+	private TicketRepository ticketRepository;
+
+	@Autowired
+	private CommentRepository commentRepository;
+
+	@BeforeEach
+	void clearDatabase() {
+		commentRepository.deleteAll();
+		ticketRepository.deleteAll();
+	}
+
+	@Test
+	void createsTicketWithOpenStatusAndServerGeneratedFields() {
+		ResponseEntity<TicketResponse> response = restTemplate.postForEntity(ticketsUrl(),
+				new CreateTicketRequest("Cannot access account", "The sign-in page fails", Priority.HIGH, "Support"),
+				TicketResponse.class);
+
+		assertEquals(HttpStatus.CREATED, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertNotNull(response.getBody().id());
+		assertEquals(TicketStatus.OPEN, response.getBody().status());
+		assertEquals("Cannot access account", response.getBody().title());
+		assertEquals(Priority.HIGH, response.getBody().priority());
+		assertNotNull(response.getBody().createdAt());
+		assertNotNull(response.getBody().updatedAt());
+	}
+
+	@Test
+	void returnsStructuredValidationErrorsForInvalidCreateFields() {
+		assertValidationError("{\"title\":\"\",\"description\":\"Description\",\"priority\":\"LOW\"}", "title");
+		assertValidationError("{\"title\":\"Title\",\"description\":\"\",\"priority\":\"LOW\"}", "description");
+		assertValidationError("{\"title\":\"Title\",\"description\":\"Description\",\"priority\":null}", "priority");
+		assertValidationError("{\"title\":\"Title\",\"description\":\"Description\","
+				+ "\"priority\":\"NOT_A_PRIORITY\"}", "priority");
+		assertValidationError("{\"title\":\"" + "x".repeat(201)
+				+ "\",\"description\":\"Description\",\"priority\":\"LOW\"}", "title");
+		assertValidationError("{\"title\":\"Title\",\"description\":\"" + "x".repeat(2001)
+				+ "\",\"priority\":\"LOW\"}", "description");
+	}
+
+	@Test
+	void getsExistingTicketAndReturnsStructuredNotFoundForMissingTicket() {
+		UUID ticketId = createTicket("Details title", "Details description", Priority.MEDIUM);
+
+		ResponseEntity<TicketResponse> found = restTemplate.getForEntity(ticketUrl(ticketId), TicketResponse.class);
+		assertEquals(HttpStatus.OK, found.getStatusCode());
+		assertNotNull(found.getBody());
+		assertEquals(ticketId, found.getBody().id());
+		assertEquals("Details title", found.getBody().title());
+		assertNotNull(found.getBody().comments());
+
+		UUID missingId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+		ResponseEntity<ApiErrorResponse> missing = restTemplate.getForEntity(ticketUrl(missingId), ApiErrorResponse.class);
+		assertErrorResponse(missing, HttpStatus.NOT_FOUND, "NOT_FOUND", ticketPath(missingId));
+	}
+
+	@Test
+	void updatesEditableFieldsWithoutChangingStatusAndRejectsStatusInPut() {
+		UUID ticketId = createTicket("Original title", "Original description", Priority.LOW);
+		ResponseEntity<TicketResponse> updated = restTemplate.exchange(ticketUrl(ticketId), HttpMethod.PUT,
+				new HttpEntity<>(new UpdateTicketRequest("Changed title", "Changed description", Priority.CRITICAL,
+						"Account Support")), TicketResponse.class);
+
+		assertEquals(HttpStatus.OK, updated.getStatusCode());
+		assertNotNull(updated.getBody());
+		assertEquals("Changed title", updated.getBody().title());
+		assertEquals("Changed description", updated.getBody().description());
+		assertEquals(Priority.CRITICAL, updated.getBody().priority());
+		assertEquals("Account Support", updated.getBody().assignee());
+		assertEquals(TicketStatus.OPEN, updated.getBody().status());
+
+		ResponseEntity<ApiErrorResponse> forbiddenStatus = putJson(ticketId,
+				"{\"title\":\"Changed title\",\"description\":\"Changed description\","
+						+ "\"priority\":\"CRITICAL\",\"status\":\"CLOSED\"}");
+		assertErrorResponse(forbiddenStatus, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", ticketPath(ticketId));
+		assertEquals(TicketStatus.OPEN, getTicket(ticketId).status());
+	}
+
+	@Test
+	void returnsStructuredValidationErrorsForInvalidUpdate() {
+		UUID ticketId = createTicket("Original title", "Original description", Priority.LOW);
+
+		ResponseEntity<ApiErrorResponse> response = putJson(ticketId,
+				"{\"title\":\"\",\"description\":\"Description\",\"priority\":\"LOW\"}");
+
+		assertErrorResponse(response, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", ticketPath(ticketId));
+		assertTrue(response.getBody().errors().containsKey("title"));
+	}
+
+	@Test
+	void searchesBothFieldsCaseInsensitivelyAndCombinesWithStatus() {
+		UUID titleMatchId = createTicket("Login failure", "Account page is unavailable", Priority.HIGH);
+		UUID descriptionMatchId = createTicket("Network issue", "LOGIN service unavailable", Priority.MEDIUM);
+		UUID unrelatedId = createTicket("Printer issue", "Paper jam", Priority.LOW);
+		changeStatus(descriptionMatchId, TicketStatus.IN_PROGRESS);
+
+		TicketResponse[] keywordMatches = getTickets("?keyword=LOGIN");
+		assertEquals(2, keywordMatches.length);
+		assertTrue(containsTicket(keywordMatches, titleMatchId));
+		assertTrue(containsTicket(keywordMatches, descriptionMatchId));
+		assertFalse(containsTicket(keywordMatches, unrelatedId));
+
+		TicketResponse[] statusMatches = getTickets("?status=IN_PROGRESS");
+		assertEquals(1, statusMatches.length);
+		assertEquals(descriptionMatchId, statusMatches[0].id());
+
+		TicketResponse[] combinedMatches = getTickets("?keyword=login&status=IN_PROGRESS");
+		assertEquals(1, combinedMatches.length);
+		assertEquals(descriptionMatchId, combinedMatches[0].id());
+	}
+
+	@Test
+	void blankKeywordDoesNotFilterTickets() {
+		createTicket("Alpha", "First description", Priority.LOW);
+		createTicket("Beta", "Second description", Priority.MEDIUM);
+		createTicket("Gamma", "Third description", Priority.HIGH);
+
+		URI blankKeywordUri = UriComponentsBuilder.fromUriString(ticketsUrl())
+				.queryParam("keyword", "  \t")
+				.build()
+				.encode()
+				.toUri();
+		TicketResponse[] tickets = restTemplate.getForObject(blankKeywordUri, TicketResponse[].class);
+
+		assertEquals(3, tickets.length);
+	}
+
+	@Test
+	void appliesEveryValidStatusTransitionThroughRestAndPersistsIt() {
+		List<TransitionCase> transitions = List.of(
+				new TransitionCase(List.of(), TicketStatus.IN_PROGRESS),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS), TicketStatus.RESOLVED),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED), TicketStatus.CLOSED),
+				new TransitionCase(List.of(), TicketStatus.CANCELLED),
+				new TransitionCase(List.of(TicketStatus.IN_PROGRESS), TicketStatus.CANCELLED));
+
+		for (TransitionCase transition : transitions) {
+			UUID ticketId = createTicket("Transition ticket", "State machine test", Priority.MEDIUM);
+			for (TicketStatus setupStatus : transition.setupTransitions()) {
+				assertEquals(HttpStatus.OK, patchStatus(ticketId, setupStatus).getStatusCode());
+			}
+
+			ResponseEntity<TicketResponse> changed = patchStatus(ticketId, transition.targetStatus());
+			assertEquals(HttpStatus.OK, changed.getStatusCode());
+			assertNotNull(changed.getBody());
+			assertEquals(transition.targetStatus(), changed.getBody().status());
+			assertEquals(transition.targetStatus(), getTicket(ticketId).status());
+		}
+	}
+
+	@Test
+	void rejectsEveryInvalidTransitionAndKeepsPersistedStatusUnchanged() {
+		for (TicketStatus currentStatus : TicketStatus.values()) {
+			UUID ticketId = createTicket("Invalid transition ticket", "State machine test", Priority.MEDIUM);
+			for (TicketStatus setupStatus : pathTo(currentStatus)) {
+				assertEquals(HttpStatus.OK, patchStatus(ticketId, setupStatus).getStatusCode());
+			}
+
+			for (TicketStatus requestedStatus : TicketStatus.values()) {
+				if (!allowedTransitionsFrom(currentStatus).contains(requestedStatus)) {
+					ResponseEntity<ApiErrorResponse> rejected = patchStatusForError(ticketId, requestedStatus);
+					assertErrorResponse(rejected, HttpStatus.CONFLICT, "INVALID_STATUS_TRANSITION",
+							ticketPath(ticketId) + "/status");
+					assertTrue(rejected.getBody().message().contains(currentStatus.name()));
+					assertTrue(rejected.getBody().message().contains(requestedStatus.name()));
+					assertEquals(currentStatus, getTicket(ticketId).status());
+				}
+			}
+		}
+	}
+
+	private void assertValidationError(String requestBody, String field) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		ResponseEntity<ApiErrorResponse> response = restTemplate.exchange(ticketsUrl(), HttpMethod.POST,
+				new HttpEntity<>(requestBody, headers), ApiErrorResponse.class);
+		assertErrorResponse(response, HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "/api/tickets");
+		assertTrue(response.getBody().errors().containsKey(field));
+	}
+
+	private ResponseEntity<ApiErrorResponse> putJson(UUID ticketId, String requestBody) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		return restTemplate.exchange(ticketUrl(ticketId), HttpMethod.PUT, new HttpEntity<>(requestBody, headers),
+				ApiErrorResponse.class);
+	}
+
+	private ResponseEntity<TicketResponse> patchStatus(UUID ticketId, TicketStatus status) {
+		return restTemplate.exchange(statusUrl(ticketId), HttpMethod.PATCH,
+				new HttpEntity<>(new ChangeTicketStatusRequest(status)), TicketResponse.class);
+	}
+
+	private ResponseEntity<ApiErrorResponse> patchStatusForError(UUID ticketId, TicketStatus status) {
+		return restTemplate.exchange(statusUrl(ticketId), HttpMethod.PATCH,
+				new HttpEntity<>(new ChangeTicketStatusRequest(status)), ApiErrorResponse.class);
+	}
+
+	private UUID createTicket(String title, String description, Priority priority) {
+		ResponseEntity<TicketResponse> response = restTemplate.postForEntity(ticketsUrl(),
+				new CreateTicketRequest(title, description, priority, null), TicketResponse.class);
+		assertEquals(HttpStatus.CREATED, response.getStatusCode());
+		return response.getBody().id();
+	}
+
+	private void changeStatus(UUID ticketId, TicketStatus status) {
+		assertEquals(HttpStatus.OK, patchStatus(ticketId, status).getStatusCode());
+	}
+
+	private TicketResponse getTicket(UUID ticketId) {
+		return restTemplate.getForObject(ticketUrl(ticketId), TicketResponse.class);
+	}
+
+	private TicketResponse[] getTickets(String query) {
+		return restTemplate.getForObject(ticketsUrl() + query, TicketResponse[].class);
+	}
+
+	private boolean containsTicket(TicketResponse[] tickets, UUID ticketId) {
+		return Arrays.stream(tickets).anyMatch(ticket -> ticket.id().equals(ticketId));
+	}
+
+	private void assertErrorResponse(ResponseEntity<ApiErrorResponse> response, HttpStatus status,
+			String code, String path) {
+		assertEquals(status, response.getStatusCode());
+		assertNotNull(response.getBody());
+		assertNotNull(response.getBody().timestamp());
+		assertEquals(status.value(), response.getBody().status());
+		assertEquals(code, response.getBody().code());
+		assertFalse(response.getBody().message().isBlank());
+		assertEquals(path, response.getBody().path());
+	}
+
+	private String ticketsUrl() {
+		return "http://localhost:" + port + "/api/tickets";
+	}
+
+	private String ticketUrl(UUID ticketId) {
+		return ticketPath(ticketId);
+	}
+
+	private String statusUrl(UUID ticketId) {
+		return ticketUrl(ticketId) + "/status";
+	}
+
+	private String ticketPath(UUID ticketId) {
+		return "/api/tickets/" + ticketId;
+	}
+
+	private List<TicketStatus> pathTo(TicketStatus status) {
+		return switch (status) {
+			case OPEN -> List.of();
+			case IN_PROGRESS -> List.of(TicketStatus.IN_PROGRESS);
+			case RESOLVED -> List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED);
+			case CLOSED -> List.of(TicketStatus.IN_PROGRESS, TicketStatus.RESOLVED, TicketStatus.CLOSED);
+			case CANCELLED -> List.of(TicketStatus.CANCELLED);
+		};
+	}
+
+	private Set<TicketStatus> allowedTransitionsFrom(TicketStatus status) {
+		return switch (status) {
+			case OPEN -> OPEN_TRANSITIONS;
+			case IN_PROGRESS -> IN_PROGRESS_TRANSITIONS;
+			case RESOLVED -> RESOLVED_TRANSITIONS;
+			case CLOSED, CANCELLED -> Set.of();
+		};
+	}
+
+	private record TransitionCase(List<TicketStatus> setupTransitions, TicketStatus targetStatus) {
+	}
+}
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Compile the final deterministic Ticket validation test updates along with all backend/test sources.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath" -d /tmp/c2jir-ticket-step15-classes $(find src/main/java -name '*.java') && javac --release 21 -cp "/tmp/c2jir-ticket-step15-classes:$dependency_classpath" -d /tmp/c2jir-ticket-step15-test-classes $(find src/test/java -name '*.java')
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && javac --release 21 -cp "$dependency_classpath"
+-d /tmp/c2jir-ticket-step15-classes $(find src/main/java -name '*.java') && java
+c --release 21 -cp "/tmp/c2jir-ticket-step15-classes:$dependency_classpath" -d /
+tmp/c2jir-ticket-step15-test-classes $(find src/test/java -name '*.java')
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` dependency\_classpath=$\(find "$HOME/.m2/repository" -type f -name '\*.jar' \! -...`
+
+Rerun Ticket REST integration tests after adding invalid-enum and maximum-length request coverage.
+
+```bash
+dependency_classpath=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-classes:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_classpath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControllerIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPresent(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : testClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(true); try { method.invoke(instance); manager.afterTestMethod(instance, method, null); passed++; System.out.println("PASS " + method.getName()); } catch (InvocationTargetException exception) { manager.afterTestMethod(instance, method, exception.getCause()); manager.afterTestClass(); throw new RuntimeException(exception.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases");
+if (passed != 9) System.exit(1);
+/exit
+EOF
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-c
+lasses:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControlle
+rIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases"
+);
+EOFitassed != 9) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.TicketC
+ontrollerIntegrationTest")testClass ==> class com.supportticket.controller.Ticke
+tControllerIntegrationTest
+
+jshell> var manage
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `content.txt`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/.config/Code/User/workspaceStorage/7d45d1239bce03a85c20ffe4993f1eb9/GitHub.copilot-chat/chat-session-resources/0ab54bd7-5f14-4d70-8a6a-b9cd9762c10f/call_BL3PNs5Cmv4ehgTla1h3i17u__vscode-1790509702706/content.txt`
+- startLine: `1`
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  dependency_classpat
+h=$(find "$HOME/.m2/repository" -type f -name '*.jar' ! -path '*/org/slf4j/slf4j
+-api/1.7.36/*' -printf '%p:') && jshell --class-path "/tmp/c2jir-ticket-step15-c
+lasses:/tmp/c2jir-ticket-step15-test-classes:src/main/resources:$dependency_clas
+spath" <<'EOF'
+import java.lang.reflect.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.test.context.TestContextManager;
+Class<?> testClass = Class.forName("com.supportticket.controller.TicketControlle
+rIntegrationTest");
+var manager = new TestContextManager(testClass);
+manager.beforeTestClass();
+var constructor = testClass.getDeclaredConstructor(); constructor.setAccessible(
+true);
+var instance = constructor.newInstance();
+manager.prepareTestInstance(instance);
+int passed = 0;
+for (var method : testClass.getDeclaredMethods()) { if (method.isAnnotationPrese
+nt(Test.class)) { manager.beforeTestMethod(instance, method); for (var setup : t
+estClass.getDeclaredMethods()) { if (setup.isAnnotationPresent(BeforeEach.class)
+) { setup.setAccessible(true); setup.invoke(instance); } } method.setAccessible(
+true); try { method.invoke(instance); manager.afterTestMethod(instance, method,
+null); passed++; System.out.println("PASS " + method.getName()); } catch (Invoca
+tionTargetException exception) { manager.afterTestMethod(instance, method, excep
+tion.getCause()); manager.afterTestClass(); throw new RuntimeException(exception
+.getCause()); } } }
+manager.afterTestClass();
+System.out.println("Passed " + passed + " TicketControllerIntegrationTest cases"
+);
+EOFitassed != 9) System.exit(1);
+|  Welcome to JShell -- Version 21.0.2
+|  For an introduction type: /help intro
+
+jshell> 
+jshell> 
+jshell> 
+jshell> 
+jshell> Class<?> testClass = Class.forName("com.supportticket.controller.TicketC
+ontrollerIntegrationTest")testClass ==> class com.supportticket.controller.Ticke
+tControllerIntegrationTest
+
+jshell> var manage
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+All nine final Ticket integration methods pass, including oversized fields and invalid enum values. Together with the earlier four Comment integration methods and 31 service test invocations, the complete existing/new test set has passed under the cached Spring/JUnit execution path; I’m doing final diagnostics and confirming the exact test files touched.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short --untracked-files=all`
+
+Confirm the exact changed test files and ensure no production/specification files were modified for this step.
+
+```bash
+git status --short --untracked-files=all
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? src/main/java/com/supportticket/controller/TicketController.java
+?? src/main/java/com/supportticket/service/CommentService.java
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.j
+ava
+?? src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.ja
+va
+?? src/test/java/com/supportticket/service/TicketServiceTest.java
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `TicketControllerIntegrationTest.java`, `CommentControllerIntegrationTest.java`, `TicketServiceTest.java`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.java",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.java">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/src/test/java/com/supportticket/service/TicketServiceTest.java">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+**Files changed**
+- Added `src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.java`
+- Updated `src/test/java/com/supportticket/service/TicketServiceTest.java` so no-save assertions verify , the service’s persistence call.
+
+**Coverage and results**
+The Ticket API integration tests cover create and validation errors, get/not-found, update and status protection, search/filter combinations, blank keywords, and state transitions. All five valid transitions and all 20 invalid transitions are exercised through REST; rejected transitions return 409 and a follow-up GET confirms status is unchanged. The existing four Comment integration tests also passed.
+
+In total, **44 test invocations passed**: 9 Ticket API tests, 4 Comment API tests, and 31 service-test invocations. Production and test sources compiled with Java 21. No production behavior fixes were needed.
+
+`mvn test` could not run because Maven is unavailable and there is no wrapper; tests were executed using cached dependencies and Spring TestContext. File-based H2 restart persistence remains a manual acceptance check; production H2 configuration was not changed. Initial test-only issues—a missing import and double-encoded blank-keyword URI—were corrected.
+
+---
+
+_**User (2026-09-27 12:38:58Z)**_
+
+Implement STEP 16 of the implementation plan: minimal frontend for the Support Ticket Management System.
+
+First read:
+- spec/requirements.md
+- spec/api-contract.md
+- spec/ui-flow.md
+- spec/state-machine.md
+- plan/implementation-plan.md
+
+Inspect the existing project structure and determine whether a frontend already exists.
+
+If no frontend exists, create a minimal React + Vite frontend using the project's existing setup. Do not introduce unnecessary libraries.
+
+Frontend scope:
+
+1. Ticket List page
+- Load tickets using GET /api/tickets
+- Display:
+  - id
+  - title
+  - priority
+  - status
+  - assignee
+  - createdAt
+- Provide:
+  - keyword search
+  - status filter
+  - create ticket action
+- Support loading, empty and error states.
+
+2. Create Ticket
+Fields:
+- title
+- description
+- priority
+- assignee
+
+Submit:
+POST /api/tickets
+
+After successful creation:
+- show the created ticket
+- navigate/open its details
+
+Validation:
+- Display backend field-level validation errors.
+- Do not duplicate complex backend business rules in the frontend.
+
+3. Ticket Details
+Display:
+- title
+- description
+- priority
+- status
+- assignee
+- createdAt
+- updatedAt
+- comments
+
+Actions:
+- Edit ticket
+- Change status
+- Add comment
+
+4. Edit Ticket
+Allow editing only:
+- title
+- description
+- priority
+- assignee
+
+Use:
+PUT /api/tickets/{id}
+
+Do NOT allow status editing through PUT.
+
+5. Status transition
+Use:
+PATCH /api/tickets/{id}/status
+
+Only show the transitions defined in spec/state-machine.md:
+
+OPEN:
+- IN_PROGRESS
+- CANCELLED
+
+IN_PROGRESS:
+- RESOLVED
+- CANCELLED
+
+RESOLVED:
+- CLOSED
+
+CLOSED:
+- none
+
+CANCELLED:
+- none
+
+The frontend restrictions are only UX guidance. The backend remains authoritative.
+
+If the backend returns:
+409 INVALID_STATUS_TRANSITION
+- display a meaningful error
+- reload the ticket so the UI reflects the server state.
+
+6. Add Comment
+Fields:
+- author
+- content
+
+Use:
+POST /api/tickets/{id}/comments
+
+After successful creation:
+- refresh ticket details/comments.
+
+7. Error handling
+Handle:
+- 400 validation errors
+- 404 not found
+- 409 invalid status transition
+- unexpected API errors
+
+Display meaningful user-facing messages.
+Do not expose stack traces or internal implementation details.
+
+8. API client
+Keep HTTP calls centralized in a small API/client module rather than scattering fetch calls throughout components.
+
+9. Configuration
+Use a configurable backend base URL.
+Do not hard-code secrets or credentials.
+
+10. Scope restrictions
+Do NOT add:
+- authentication
+- authorization
+- dashboards
+- notifications
+- pagination
+- Redux/global state libraries unless already required
+- unnecessary UI libraries
+- extra backend APIs
+
+11. Code quality
+- Keep components small and understandable.
+- Reuse components where reasonable.
+- Use clear names.
+- Avoid overengineering.
+- Follow the existing frontend conventions if a frontend already exists.
+
+After implementation:
+1. Run the frontend build.
+2. Fix genuine compile/runtime errors.
+3. Report:
+   - files created/changed
+   - frontend routes/pages
+   - API calls implemented
+   - validation/error handling
+   - build result
+   - any issues encountered
+
+---
+
+_**Agent (copilot/auto)**_
+
+<think><details><summary>Thought Process</summary>
+The install command ran from the repository root, where no `package.json` exists; the frontend manifest is correctly under `frontend/`. I’m rerunning the same install from that subdirectory.
+
+The terminal remained in `frontend/` after dependency installation, so the build command’s extra `cd frontend` targeted a nonexistent nested directory. I’m rerunning the same build from the current frontend directory; no source change is needed.
+
+Vite didn’t start because this terminal session was at the repository root, unlike the build terminal. I’m explicitly entering `frontend/` in the launch command; the app build itself remains successful.
+</details></think>
+
+_**Agent (copilot/auto)**_
+
+I’ll read the five requested documents, then check the workspace for any existing frontend, package scripts, and local instructions before deciding whether to scaffold Vite. I’ll keep the UI and HTTP client limited to the specified ticket flows and avoid modifying backend behavior.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `implementation-plan.md`
+
+**Input:**
+
+- endLine: `380`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/plan/implementation-plan.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Implementation Plan
+
+This plan follows the finalized specifications and repository rules. Implement only the required behavior; do not add authentication, Kafka, Redis, notifications, dashboards, pagination, Docker, microservices, cloud infrastructure, or other out-of-scope features. In particular, the backend state machine is authoritative: frontend transition controls are guidance and must not replace backend enforcement.
+
+Paths such as `<backend-root>` and `<frontend-root>` are placeholders for the chosen project layout. Create only files needed for the listed responsibilities.
+
+## Sequential Tasks
+
+### Task 01: Project and Backend Foundation
+
+- **Purpose:** Confirm the approved specifications as the implementation baseline; establish the minimal Java 21/Spring Boot backend application and build configuration.
+- **Files/packages likely to be created or changed:** `<backend-root>/` build and application configuration files; application bootstrap under the chosen root package.
+- **Dependencies/prerequisites:** All specification and guidance documents approved; none of the application layers exists yet.
+- **Validation/test expected:** Backend builds and starts with its test profile; verify Java 21 and Spring Boot configuration. No business behavior is added here.
+
+### Task 02: Domain Enums and Entities
+
+- **Purpose:** Define the ticket and comment domain/persistence shapes and approved value sets.
+- **Files/packages likely to be created or changed:** `<application-root>/entity/Ticket`, `Comment`; `<application-root>/entity/TicketStatus`, `Priority` (or equivalent domain package).
+- **Dependencies/prerequisites:** Task 01.
+- **Validation/test expected:** Compile and add focused model checks if the chosen persistence mapping requires them; confirm all enum values and fields match `spec/data-model.md`.
+
+### Task 03: Repository and Persistence
+
+- **Purpose:** Persist and retrieve tickets and comments using file-based H2 for local devel
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `requirements.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/requirements.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System Requirements
+
+## Scope
+
+The system provides a user interface and REST API for creating, finding, viewing, and maintaining support tickets. Ticket data must be stored in a database and remain available after an application restart. The system must enforce the specified ticket status workflow on the backend.
+
+Technology constraints are Java 21, Spring Boot, PostgreSQL or H2, a REST API, and React/Next.js or an equivalent frontend. Use file-based H2 for local development so persisted data survives an application restart. Other environments may use PostgreSQL or H2. Except for the status-transition route defined below, these constraints do not prescribe endpoint shapes or screen layout.
+
+## Functional Requirements
+
+1. A user can create a ticket from the UI.
+2. A user can list tickets.
+3. A user can view the details of a ticket.
+4. A user can update a ticket's title, description, priority, and assignee. Assignee is an optional String field.
+5. A user can add comments to a ticket. Each comment contains `id`, `ticketId`, `author`, `content`, and `createdAt`. The server generates the comment `id` as a UUID and generates `createdAt`; the client supplies `author` as a String.
+6. A user can search tickets by keyword in the title and description using case-insensitive substring matching. A blank or whitespace-only keyword applies no search filter. Search can be combined with status filtering.
+7. A user can filter tickets by status.
+8. The system persists ticket data in a database so that it survives application restart.
+9. The backend validates input according to the validation requirements below.
+10. A client requests a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target `status`. The backend accepts only valid transitions and rejects invalid transitions, as defined in [state-machine.md](state-machine.md).
+11. The UI displays meaningful errors when an operation fails.
+
+## Non-Functional Requirements
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `api-contract.md`
+
+**Input:**
+
+- endLine: `400`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/api-contract.md`
+- startLine: `1`
+
+**Result:**
+
+````
+# Support Ticket Management System API Contract
+
+This document defines the JSON REST contract for the required ticket and comment operations. Ticket and comment fields follow [data-model.md](data-model.md); ticket statuses and allowed transitions follow [state-machine.md](state-machine.md). Persistence entities are not exposed directly; the JSON resources below are API representations.
+
+Ticket IDs and comment IDs are server-generated UUIDs. The server generates `createdAt` and `updatedAt`; clients must not provide or modify IDs or timestamps. Timestamp values are read-only ISO-8601 strings in UTC, for example `2026-09-27T10:30:00Z`. In the examples below, `<server-generated timestamp>` stands in for a value in this format. New tickets start with status `OPEN`. No authentication, deletion, or pagination endpoints are included.
+
+## Common Error Response
+
+Errors use the consistent JSON structure defined in [requirements.md](requirements.md). Validation errors also contain field-level `errors`.
+
+Validation error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "Request validation failed",
+  "errors": {
+    "title": "Title is required"
+  },
+  "path": "/api/tickets"
+}
+```
+
+Not-found error example:
+
+```json
+{
+  "timestamp": "<server-generated timestamp>",
+  "status": 404,
+  "code": "NOT_FOUND",
+  "message": "Ticket not found",
+  "path": "/api/tickets/550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+## Create Ticket
+
+- **Method:** `POST`
+- **Path:** `/api/tickets`
+- **Query parameters:** None
+- **Request JSON:** `title`, `description`, and `priority` are required. `assignee` is optional. Do not send `id`, `status`, `createdAt`, or `updatedAt`; the server generates the ID and timestamps and assigns `OPEN` status.
+
+```json
+{
+  "title": "Cannot access account",
+  "description": "The sign-in page returns an error.",
+  "priority": "HIGH",
+  "assignee": "Support Team"
+}
+```
+
+- **Success:** `201 CREATED`
+- *
+… (output truncated)
+````
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `ui-flow.md`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/ui-flow.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Support Ticket Management System UI Flow
+
+This document describes a simple user flow based on the finalized [requirements](requirements.md), [state machine](state-machine.md), [architecture](architecture.md), [data model](data-model.md), and [API contract](api-contract.md). It defines behavior, not visual styling or implementation components.
+
+## Ticket List
+
+On entry, load tickets using `GET /api/tickets` and display the returned tickets, including their current status. Show a loading state while the request is in progress, an empty state when there are no matching tickets, and an error state if loading fails.
+
+The list provides:
+
+- A keyword field and a status filter, plus a create-ticket action.
+- Search through `GET /api/tickets?keyword={keyword}&status={status}`. Send either optional query parameter independently or both together. Omit a blank or whitespace-only keyword so it applies no keyword filter. Search is case-insensitive substring matching on title and description.
+- A way to open a ticket's details. Selecting a ticket loads `GET /api/tickets/{id}`.
+
+While a search or filter request is loading, indicate that the results are updating. If it fails, show a meaningful error and retain the available controls so the user can correct the query or retry. Do not add pagination.
+
+## Create Ticket
+
+From the list, the user opens the create-ticket form and enters:
+
+- Title (required, 1-200 characters)
+- Description (required, 1-2000 characters)
+- Priority (required: `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`)
+- Assignee (optional String)
+
+On submit, send `POST /api/tickets` with those editable fields. Do not ask for an ID, status, or timestamps; the server generates these and starts the ticket in `OPEN`.
+
+Show a submitting state while waiting. On success, show the created ticket, including its server-assigned ID and `OPEN` status, by opening its details. On HTTP `400 BAD_REQUEST`, display backend field-level validation messages next to the relevant fields and preserve
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `state-machine.md`
+
+**Input:**
+
+- endLine: `260`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/spec/state-machine.md`
+- startLine: `1`
+
+**Result:**
+
+```
+# Ticket State Machine
+
+This document defines the allowed ticket status transitions. The backend is authoritative and must reject transitions not listed as valid.
+
+New tickets always start in `OPEN`.
+
+## States
+
+- `OPEN`
+- `IN_PROGRESS`
+- `RESOLVED`
+- `CLOSED`
+- `CANCELLED`
+
+## Valid Transitions
+
+| Current state | Requested state | Result |
+| --- | --- | --- |
+| `OPEN` | `IN_PROGRESS` | Allowed |
+| `OPEN` | `CANCELLED` | Allowed |
+| `IN_PROGRESS` | `RESOLVED` | Allowed |
+| `IN_PROGRESS` | `CANCELLED` | Allowed |
+| `RESOLVED` | `CLOSED` | Allowed |
+
+## Invalid Transitions
+
+Any transition not listed in the valid-transition table is invalid, including same-state requests. `CLOSED` and `CANCELLED` are terminal states and have no outgoing transitions. Examples include:
+
+| Current state | Requested state | Result |
+| --- | --- | --- |
+| `CLOSED` | `OPEN` | Rejected |
+| `CLOSED` | `IN_PROGRESS` | Rejected |
+| `RESOLVED` | `OPEN` | Rejected |
+| `RESOLVED` | `CANCELLED` | Rejected |
+| `CANCELLED` | `OPEN` | Rejected |
+| `CANCELLED` | `IN_PROGRESS` | Rejected |
+| Any state | Same state | Rejected |
+
+## Transition Rules
+
+- A ticket may move only along a valid transition listed above.
+- Every new ticket starts in `OPEN`.
+- The backend must validate each requested transition; frontend restrictions do not replace backend validation.
+- Request a status transition using `PATCH /api/tickets/{id}/status` with a JSON body containing the target status, for example `{ "status": "IN_PROGRESS" }`.
+- A rejected transition must not change the ticket's current state.
+- Valid transitions have no additional business preconditions or required side effects.
+
+## Expected Backend Behavior for Invalid Transitions
+
+- Reject the requested transition and leave the ticket in its current state.
+- Return HTTP `409 CONFLICT`.
+- Return the error using the project's standard API error format.
+- Do not expose internal exception details.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The specifications call for a compact list/detail workflow, with service-backed validation/errors and only five status actions. The current plan’s frontend foundation is not evident yet; I’m checking for existing package/config files and local setup instructions, and reviewing the project-setup guidance before creating anything.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short --untracked-files=all`
+
+Check existing user changes before creating any frontend files.
+
+```bash
+git status --short --untracked-files=all
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  git status --short
+--untracked-files=all
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? src/main/java/com/supportticket/controller/TicketController.java
+?? src/main/java/com/supportticket/service/CommentService.java
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.j
+ava
+?? src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.ja
+va
+?? src/test/java/com/supportticket/service/TicketServiceTest.java
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
+
+Read `c2JiraTicket`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket`
+
+**Result:**
+
+```
+.git/
+.gitignore
+.specstory/
+.vscode/
+commands/
+data/
+docs/
+plan/
+pom.xml
+rules/
+skills/
+spec/
+src/
+target/
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="search" data-tool-name="file_search"><details>
+<summary>Tool use: **file_search**</summary>
+
+Searched for files matching `**/package.json`, no matches
+
+**Input:**
+
+- query: `**/package.json`
+
+**Result:**
+
+```
+No files found
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="search" data-tool-name="file_search"><details>
+<summary>Tool use: **file_search**</summary>
+
+Searched for files matching `**/vite.config.*`, no matches
+
+**Input:**
+
+- query: `**/vite.config.*`
+
+**Result:**
+
+```
+No files found
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="search" data-tool-name="file_search"><details>
+<summary>Tool use: **file_search**</summary>
+
+Searched for files matching `**/AGENTS.md`, no matches
+
+**Input:**
+
+- query: `AGENTS.md`
+
+**Result:**
+
+```
+No files found
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read skill `project-setup-info-local`
+
+**Input:**
+
+- endLine: `300`
+- filePath: `/snap/code/265/usr/share/code/resources/app/extensions/copilot/assets/prompts/skills/project-setup-info-local/SKILL.md`
+- startLine: `1`
+
+**Result:**
+
+````
+---
+name: project-setup-info-local
+description: 'Comprehensive setup steps to help the user create complete project structures in a VS Code workspace; this tool is designed for full project initialization and scaffolding, not for creating individual files. When to use this tool: user wants to create a new complete project from scratch; setting up entire project frameworks (TypeScript projects, React apps, Node.js servers, etc.); initializing Model Context Protocol (MCP) servers with full structure; creating VS Code extensions with proper scaffolding; setting up Next.js, Vite, or other framework-based projects; user asks for "new project", "create a workspace", "set up a [framework] project"; need to establish a complete development environment with dependencies, config files, and folder structure. When NOT to use this tool: creating single files or small code snippets; adding individual files to existing projects; making modifications to existing codebases; user asks to "create a file" or "add a component"; simple code examples or demonstrations; debugging or fixing existing code. This tool provides complete project setup including: folder structure creation; package.json and dependency management; configuration files (tsconfig, eslint, etc.); initial boilerplate code; development environment setup; build and run instructions. Use other file creation tools for individual files within existing projects.'
+---
+
+# How to setup a project
+
+Determine what kind of project the user wants to create, then based on that, choose which setup info below to follow. Only setup a project if the folder is empty or if you've just called the tool first calling the tool to create a workspace.
+
+## vscode-extension
+
+A template for creating a VS Code extension using Yeoman and Generator-Code.
+
+Run this command:
+
+```
+npx --package yo --package generator-code -- yo code . --skipOpen
+```
+The command has the following arguments:
+
+- `-t, --extensionType`: Specify extension type: ts, js, command-
+… (output truncated)
+````
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+There is no existing frontend or package manifest, and the setup guidance says not to scaffold over this non-empty 
+
+There is no existing frontend or package manifest, and the setup guidance says not to scaffold over this non-empty repository. I’ll add a self-contained `frontend/` Vite app instead; first I’m confirming Node/npm and ignore rules, then I’ll create the subdirectory and implement the ticket workspace with a centralized client.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` node --version; npm --version; git --no-pager log -1 --oneline`
+
+Confirm frontend runtime/tooling availability and package-worktree context before scaffolding the new frontend directory.
+
+```bash
+node --version; npm --version; git --no-pager log -1 --oneline
+```
+
+**Result:**
+
+```
+v20.19.3
+10.8.2
+cdd1ed3 (HEAD -> main, origin/main) BE implmentations
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
+
+Read `.vscode`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket/.vscode`
+
+**Result:**
+
+```
+settings.json
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file"><details>
+<summary>Tool use: **read_file**</summary>
+
+Read `.gitignore`
+
+**Input:**
+
+- endLine: `160`
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/.gitignore`
+- startLine: `1`
+
+**Result:**
+
+```
+/target/
+/data/
+*.mv.db
+*.trace.db
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Node 20/npm 10 are available, and no frontend or package config exists. I’ll create a separate `frontend/` Vite app with only React, Vite, and Lucide icons, plus one shared ticket form, one centralized API client, hash-based routes, and responsive CSS; production API origin will be configurable via environment variables.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="tool_search"><details>
+<summary>Tool use: **tool_search**</summary>
+
+**Input:**
+
+- query: `Create a new directory within the current VS Code workspace`
+
+**Result:**
+
+```
+["create_new_workspace","create_directory","install_extension","run_vscode_command","create_new_jupyter_notebook"]
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="create_directory"><details>
+<summary>Tool use: **create_directory**</summary>
+
+Created `src`
+
+**Input:**
+
+- dirPath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src`
+
+**Result:**
+
+```
+Created directory at /home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+I’m creating the frontend shell/config and centralized API module first, then I’ll add the list/detail/form components and responsive styling. The Vite proxy will target `VITE_BACKEND_URL` (default `localhost:8080`), while `VITE_API_BASE_URL` can point the client at another API origin; `.env.example` documents both.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `package.json`
+
+**Input:**
+
+- content:
+
+```
+{
+  "name": "support-ticket-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "vite": "^6.3.5"
+  }
+}
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/package.json`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/package.json
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `vite.config.js`
+
+**Input:**
+
+- content:
+
+```
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
+    plugins: [react()],
+    server: {
+      host: '0.0.0.0',
+      proxy: {
+        '/api': {
+          target: env.VITE_BACKEND_URL || 'http://localhost:8080',
+          changeOrigin: true,
+        },
+      },
+    },
+  };
+});
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/vite.config.js`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/vite.config.js
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `index.html`
+
+**Input:**
+
+- content:
+
+```
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f7f5" />
+    <meta name="description" content="Support ticket management workspace" />
+    <title>Support Desk</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/index.html`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/index.html
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `.env.example`
+
+**Input:**
+
+- content:
+
+```
+# API prefix used by the browser client. Set an absolute URL for another API origin.
+VITE_API_BASE_URL=/api
+
+# Vite development proxy target.
+VITE_BACKEND_URL=http://localhost:8080
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/.env.example`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/.env.example
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `api.js`
+
+**Input:**
+
+- content:
+
+```
+const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = configuredBaseUrl.replace(/\/$/, '');
+
+export class ApiError extends Error {
+  constructor({ status, code, errors }) {
+    super(code || 'API_ERROR');
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.errors = errors || {};
+  }
+}
+
+async function request(path, options = {}) {
+  let response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new ApiError({ status: 0, code: 'NETWORK_ERROR' });
+  }
+
+  const responseText = await response.text();
+  let payload = null;
+  if (responseText) {
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!response.ok) {
+    throw new ApiError({
+      status: response.status,
+      code: payload?.code || 'API_ERROR',
+      errors: payload?.errors,
+    });
+  }
+
+  return payload;
+}
+
+export function listTickets({ keyword = '', status = '' } = {}) {
+  const params = new URLSearchParams();
+  if (keyword.trim()) params.set('keyword', keyword.trim());
+  if (status) params.set('status', status);
+  const query = params.toString();
+  return request(`/tickets${query ? `?${query}` : ''}`);
+}
+
+export function getTicket(ticketId) {
+  return request(`/tickets/${encodeURIComponent(ticketId)}`);
+}
+
+export function createTicket(fields) {
+  return request('/tickets', { method: 'POST', body: JSON.stringify(fields) });
+}
+
+export function updateTicket(ticketId, fields) {
+  return request(`/tickets/${encodeURIComponent(ticketId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(fields),
+  });
+}
+
+export function changeTicketStatus(ticketId, status) {
+  return request(`/tickets/${encodeURIComponent(ticketId)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function addComment(ticketId, fields) {
+  return request(`/tickets/${encodeURIComponent(ticketId)}/comments`, {
+    method: 'POST',
+    body: JSON.stringify(fields),
+  });
+}
+
+export function userMessageFor(error, fallback = 'The request could not be completed. Please try again.') {
+  switch (error?.code) {
+    case 'VALIDATION_ERROR':
+      return 'Please review the highlighted fields and try again.';
+    case 'NOT_FOUND':
+      return 'This ticket is no longer available.';
+    case 'INVALID_STATUS_TRANSITION':
+      return 'That status change is no longer available. The ticket has been refreshed.';
+    case 'NETWORK_ERROR':
+      return 'Cannot reach the support service. Check the connection and try again.';
+    default:
+      return fallback;
+  }
+}
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/api.js`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/api.js
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `main.jsx`
+
+**Input:**
+
+- content:
+
+```
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.jsx';
+import './styles.css';
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/main.jsx`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/main.jsx
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **package.json**</summary>
+
+@@ lines 1-1 @@
+
+```
+{
+  "name": "support-ticket-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "vite": "^6.3.5"
+  }
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **vite.config.js**</summary>
+
+@@ lines 1-1 @@
+
+```
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
+    plugins: [react()],
+    server: {
+      host: '0.0.0.0',
+      proxy: {
+        '/api': {
+          target: env.VITE_BACKEND_URL || 'http://localhost:8080',
+          changeOrigin: true,
+        },
+      },
+    },
+  };
+});
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **index.html**</summary>
+
+@@ lines 1-1 @@
+
+```
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f7f5" />
+    <meta name="description" content="Support ticket management workspace" />
+    <title>Support Desk</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **.env.example**</summary>
+
+@@ lines 1-1 @@
+
+```
+# API prefix used by the browser client. Set an absolute URL for another API origin.
+VITE_API_BASE_URL=/api
+
+# Vite development proxy target.
+VITE_BACKEND_URL=http://localhost:8080
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **api.js**</summary>
+
+@@ lines 1-1 @@
+
+```
+const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = configuredBaseUrl.replace(/\/$/, '');
+
+export class ApiError extends Error {
+  constructor({ status, code, errors }) {
+    super(code || 'API_ERROR');
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.errors = errors || {};
+  }
+}
+
+async function request(path, options = {}) {
+  let response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new ApiError({ status: 0, code: 'NETWORK_ERROR' });
+  }
+
+  const responseText = await response.text();
+  let payload = null;
+  if (responseText) {
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (!response.ok) {
+    throw new ApiError({
+      status: response.status,
+      code: payload?.code || 'API_ERROR',
+      errors: payload?.errors,
+    });
+  }
+
+  return payload;
+}
+
+export function listTickets({ keyword = '', status = '' } = {}) {
+  const params = new URLSearchParams();
+  if (keyword.trim()) params.set('keyword', keyword.trim());
+  if (status) params.set('status', status);
+  const query = params.toString();
+  return request(`/tickets${query ? `?${query}` : ''}`);
+}
+
+export function getTicket(ticketId) {
+  return request(`/tickets/${encodeURIComponent(ticketId)}`);
+}
+
+export function createTicket(fields) {
+  return request('/tickets', { method: 'POST', body: JSON.stringify(fields) });
+}
+
+export function updateTicket(ticketId, fields) {
+  return request(`/tickets/${encodeURIComponent(ticketId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(fields),
+  });
+}
+
+export function changeTicketStatus(ticketId, status) {
+  return request(`/tickets/${encodeURIComponent(ticketId)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function addComment(ticketId, fields) {
+  return request(`/tickets/${encodeURIComponent(ticketId)}/comments`, {
+    method: 'POST',
+    body: JSON.stringify(fields),
+  });
+}
+
+export function userMessageFor(error, fallback = 'The request could not be completed. Please try again.') {
+  switch (error?.code) {
+    case 'VALIDATION_ERROR':
+      return 'Please review the highlighted fields and try again.';
+    case 'NOT_FOUND':
+      return 'This ticket is no longer available.';
+    case 'INVALID_STATUS_TRANSITION':
+      return 'That status change is no longer available. The ticket has been refreshed.';
+    case 'NETWORK_ERROR':
+      return 'Cannot reach the support service. Check the connection and try again.';
+    default:
+      return fallback;
+  }
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **main.jsx**</summary>
+
+@@ lines 1-1 @@
+
+```
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App.jsx';
+import './styles.css';
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The frontend scaffold and shared API client are in place. I’m adding the list and reusable create/edit form next; the search sends no keyword for whitespace-only input, and the list shows retryable loading/error/empty states without any backend validation rules being reimplemented beyond browser field hints.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `TicketForm.jsx`
+
+**Input:**
+
+- content:
+
+```
+import { ArrowLeft, Save } from 'lucide-react';
+
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+const EMPTY_TICKET = {
+  title: '',
+  description: '',
+  priority: '',
+  assignee: '',
+};
+
+export default function TicketForm({
+  mode,
+  initialValue = EMPTY_TICKET,
+  busy = false,
+  errorMessage = '',
+  fieldErrors = {},
+  onSubmit,
+  onCancel,
+}) {
+  const isEditing = mode === 'edit';
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSubmit({
+      title: initialValue.title,
+      description: initialValue.description,
+      priority: initialValue.priority,
+      assignee: initialValue.assignee ?? '',
+    });
+  }
+
+  return (
+    <form className="ticket-form" onSubmit={handleSubmit}>
+      {errorMessage && (
+        <div className="notice notice-error" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
+      <div className="form-grid">
+        <label className="field field-wide">
+          <span>Title <span className="required-mark">Required</span></span>
+          <input
+            name="title"
+            value={initialValue.title}
+            onChange={onSubmit.changeField}
+            maxLength={200}
+            required
+            autoFocus
+          />
+          {fieldErrors.title && <span className="field-error">{fieldErrors.title}</span>}
+        </label>
+
+        <label className="field field-wide">
+          <span>Description <span className="required-mark">Required</span></span>
+          <textarea
+            name="description"
+            value={initialValue.description}
+            onChange={onSubmit.changeField}
+            maxLength={2000}
+            rows={5}
+            required
+          />
+          {fieldErrors.description && <span className="field-error">{fieldErrors.description}</span>}
+          <span className="field-hint">{initialValue.description.length}/2000</span>
+        </label>
+
+        <label className="field">
+          <span>Priority <span className="required-mark">Required</span></span>
+          <select name="priority" value={initialValue.priority} onChange={onSubmit.changeField} required>
+            <option value="" disabled>Select priority</option>
+            {PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+          </select>
+          {fieldErrors.priority && <span className="field-error">{fieldErrors.priority}</span>}
+        </label>
+
+        <label className="field">
+          <span>Assignee <span className="optional-mark">Optional</span></span>
+          <input
+            name="assignee"
+            value={initialValue.assignee ?? ''}
+            onChange={onSubmit.changeField}
+            placeholder="Team or person"
+          />
+          {fieldErrors.assignee && <span className="field-error">{fieldErrors.assignee}</span>}
+        </label>
+      </div>
+
+      <div className="form-actions">
+        <button className="button button-quiet" type="button" onClick={onCancel} disabled={busy}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          Cancel
+        </button>
+        <button className="button button-primary" type="submit" disabled={busy}>
+          <Save size={16} aria-hidden="true" />
+          {busy ? 'Saving…' : isEditing ? 'Save changes' : 'Create ticket'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketForm.jsx`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketForm.jsx
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `TicketListPage.jsx`
+
+**Input:**
+
+- content:
+
+```
+import { useEffect, useState } from 'react';
+import { ArrowUpRight, Plus, RotateCw, Search } from 'lucide-react';
+import { listTickets, userMessageFor } from './api.js';
+
+const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'CANCELLED'];
+
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  }).format(date);
+}
+
+export default function TicketListPage({ onCreate }) {
+  const [tickets, setTickets] = useState([]);
+  const [draftKeyword, setDraftKeyword] = useState('');
+  const [draftStatus, setDraftStatus] = useState('');
+  const [filters, setFilters] = useState({ keyword: '', status: '' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    listTickets(filters)
+      .then((results) => { if (active) setTickets(results); })
+      .catch((requestError) => { if (active) setError(requestError); })
+      .finally(() => { if (active) setLoading(false); });
+
+    return () => { active = false; };
+  }, [filters, refreshKey]);
+
+  function applyFilters(event) {
+    event.preventDefault();
+    setFilters({ keyword: draftKeyword, status: draftStatus });
+  }
+
+  function clearFilters() {
+    setDraftKeyword('');
+    setDraftStatus('');
+    setFilters({ keyword: '', status: '' });
+  }
+
+  return (
+    <section className="page-section" aria-labelledby="tickets-heading">
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">QUEUE / ALL TICKETS</p>
+          <h1 id="tickets-heading">Tickets</h1>
+          <p className="page-subtitle">Track requests and move work forward.</p>
+        </div>
+        <button className="button button-primary" onClick={onCreate}>
+          <Plus size={17} aria-hidden="true" /> New ticket
+        </button>
+      </div>
+
+      <form className="filter-bar" onSubmit={applyFilters}>
+        <label className="search-field">
+          <Search size={17} aria-hidden="true" />
+          <span className="visually-hidden">Search tickets</span>
+          <input
+            value={draftKeyword}
+            onChange={(event) => setDraftKeyword(event.target.value)}
+            placeholder="Search title or description"
+          />
+        </label>
+        <label className="filter-status">
+          <span className="visually-hidden">Filter by status</span>
+          <select value={draftStatus} onChange={(event) => setDraftStatus(event.target.value)}>
+            <option value="">All statuses</option>
+            {STATUSES.map((status) => <option value={status} key={status}>{status.replace('_', ' ')}</option>)}
+          </select>
+        </label>
+        <button className="button button-dark" type="submit">Apply filters</button>
+        {(filters.keyword || filters.status) && (
+          <button className="button button-quiet clear-filter" type="button" onClick={clearFilters}>Clear</button>
+        )}
+        <span className="result-count" aria-live="polite">
+          {loading ? 'Updating…' : `${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`}
+        </span>
+      </form>
+
+      {error && (
+        <div className="notice notice-error" role="alert">
+          <span>{userMessageFor(error, 'Tickets could not be loaded. Please try again.')}</span>
+          <button className="button button-small button-quiet" onClick={() => setRefreshKey((key) => key + 1)}>
+            <RotateCw size={15} aria-hidden="true" /> Retry
+          </button>
+        </div>
+      )}
+
+      <div className="ticket-table-wrap">
+        <div className="ticket-table ticket-table-header" role="row">
+          <span>Ticket</span><span>Priority</span><span>Status</span><span>Assignee</span><span>Created</span><span aria-hidden="true" />
+        </div>
+        {loading ? (
+          <div className="table-state" role="status"><span className="loading-dot" /> Loading tickets…</div>
+        ) : !error && tickets.length === 0 ? (
+          <div className="table-state empty-state">
+            <span className="empty-mark"><Search size={20} aria-hidden="true" /></span>
+            <strong>No tickets found</strong>
+            <span>Try a different search or create a ticket.</span>
+            <button className="button button-secondary" onClick={onCreate}><Plus size={16} aria-hidden="true" /> New ticket</button>
+          </div>
+        ) : (
+          tickets.map((ticket) => (
+            <a className="ticket-table ticket-row" role="row" href={`#/tickets/${ticket.id}`} key={ticket.id}>
+              <span className="ticket-name-cell">
+                <strong>{ticket.title}</strong>
+                <code>{ticket.id}</code>
+              </span>
+              <span><span className={`priority-tag priority-${ticket.priority.toLowerCase()}`}>{ticket.priority}</span></span>
+              <span><span className={`status-tag status-${ticket.status.toLowerCase()}`}>{ticket.status.replace('_', ' ')}</span></span>
+              <span className="assignee-cell">{ticket.assignee || <span className="muted">Unassigned</span>}</span>
+              <span className="date-cell">{formatDate(ticket.createdAt)}</span>
+              <span className="row-arrow"><ArrowUpRight size={16} aria-hidden="true" /></span>
+            </a>
+          ))
+        )}
+      </div>
+      <div className="table-footnote"><span className="live-indicator" /> Live from the support queue</div>
+    </section>
+  );
+}
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketListPage.jsx`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketListPage.jsx
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketForm.jsx**</summary>
+
+@@ lines 1-1 @@
+
+```
+import { ArrowLeft, Save } from 'lucide-react';
+
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+const EMPTY_TICKET = {
+  title: '',
+  description: '',
+  priority: '',
+  assignee: '',
+};
+
+export default function TicketForm({
+  mode,
+  initialValue = EMPTY_TICKET,
+  busy = false,
+  errorMessage = '',
+  fieldErrors = {},
+  onSubmit,
+  onCancel,
+}) {
+  const isEditing = mode === 'edit';
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSubmit({
+      title: initialValue.title,
+      description: initialValue.description,
+      priority: initialValue.priority,
+      assignee: initialValue.assignee ?? '',
+    });
+  }
+
+  return (
+    <form className="ticket-form" onSubmit={handleSubmit}>
+      {errorMessage && (
+        <div className="notice notice-error" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
+      <div className="form-grid">
+        <label className="field field-wide">
+          <span>Title <span className="required-mark">Required</span></span>
+          <input
+            name="title"
+            value={initialValue.title}
+            onChange={onSubmit.changeField}
+            maxLength={200}
+            required
+            autoFocus
+          />
+          {fieldErrors.title && <span className="field-error">{fieldErrors.title}</span>}
+        </label>
+
+        <label className="field field-wide">
+          <span>Description <span className="required-mark">Required</span></span>
+          <textarea
+            name="description"
+            value={initialValue.description}
+            onChange={onSubmit.changeField}
+            maxLength={2000}
+            rows={5}
+            required
+          />
+          {fieldErrors.description && <span className="field-error">{fieldErrors.description}</span>}
+          <span className="field-hint">{initialValue.description.length}/2000</span>
+        </label>
+
+        <label className="field">
+          <span>Priority <span className="required-mark">Required</span></span>
+          <select name="priority" value={initialValue.priority} onChange={onSubmit.changeField} required>
+            <option value="" disabled>Select priority</option>
+            {PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+          </select>
+          {fieldErrors.priority && <span className="field-error">{fieldErrors.priority}</span>}
+        </label>
+
+        <label className="field">
+          <span>Assignee <span className="optional-mark">Optional</span></span>
+          <input
+            name="assignee"
+            value={initialValue.assignee ?? ''}
+            onChange={onSubmit.changeField}
+            placeholder="Team or person"
+          />
+          {fieldErrors.assignee && <span className="field-error">{fieldErrors.assignee}</span>}
+        </label>
+      </div>
+
+      <div className="form-actions">
+        <button className="button button-quiet" type="button" onClick={onCancel} disabled={busy}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          Cancel
+        </button>
+        <button className="button button-primary" type="submit" disabled={busy}>
+          <Save size={16} aria-hidden="true" />
+          {busy ? 'Saving…' : isEditing ? 'Save changes' : 'Create ticket'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketListPage.jsx**</summary>
+
+@@ lines 1-1 @@
+
+```
+import { useEffect, useState } from 'react';
+import { ArrowUpRight, Plus, RotateCw, Search } from 'lucide-react';
+import { listTickets, userMessageFor } from './api.js';
+
+const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'CANCELLED'];
+
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  }).format(date);
+}
+
+export default function TicketListPage({ onCreate }) {
+  const [tickets, setTickets] = useState([]);
+  const [draftKeyword, setDraftKeyword] = useState('');
+  const [draftStatus, setDraftStatus] = useState('');
+  const [filters, setFilters] = useState({ keyword: '', status: '' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    listTickets(filters)
+      .then((results) => { if (active) setTickets(results); })
+      .catch((requestError) => { if (active) setError(requestError); })
+      .finally(() => { if (active) setLoading(false); });
+
+    return () => { active = false; };
+  }, [filters, refreshKey]);
+
+  function applyFilters(event) {
+    event.preventDefault();
+    setFilters({ keyword: draftKeyword, status: draftStatus });
+  }
+
+  function clearFilters() {
+    setDraftKeyword('');
+    setDraftStatus('');
+    setFilters({ keyword: '', status: '' });
+  }
+
+  return (
+    <section className="page-section" aria-labelledby="tickets-heading">
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">QUEUE / ALL TICKETS</p>
+          <h1 id="tickets-heading">Tickets</h1>
+          <p className="page-subtitle">Track requests and move work forward.</p>
+        </div>
+        <button className="button button-primary" onClick={onCreate}>
+          <Plus size={17} aria-hidden="true" /> New ticket
+        </button>
+      </div>
+
+      <form className="filter-bar" onSubmit={applyFilters}>
+        <label className="search-field">
+          <Search size={17} aria-hidden="true" />
+          <span className="visually-hidden">Search tickets</span>
+          <input
+            value={draftKeyword}
+            onChange={(event) => setDraftKeyword(event.target.value)}
+            placeholder="Search title or description"
+          />
+        </label>
+        <label className="filter-status">
+          <span className="visually-hidden">Filter by status</span>
+          <select value={draftStatus} onChange={(event) => setDraftStatus(event.target.value)}>
+            <option value="">All statuses</option>
+            {STATUSES.map((status) => <option value={status} key={status}>{status.replace('_', ' ')}</option>)}
+          </select>
+        </label>
+        <button className="button button-dark" type="submit">Apply filters</button>
+        {(filters.keyword || filters.status) && (
+          <button className="button button-quiet clear-filter" type="button" onClick={clearFilters}>Clear</button>
+        )}
+        <span className="result-count" aria-live="polite">
+          {loading ? 'Updating…' : `${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`}
+        </span>
+      </form>
+
+      {error && (
+        <div className="notice notice-error" role="alert">
+          <span>{userMessageFor(error, 'Tickets could not be loaded. Please try again.')}</span>
+          <button className="button button-small button-quiet" onClick={() => setRefreshKey((key) => key + 1)}>
+            <RotateCw size={15} aria-hidden="true" /> Retry
+          </button>
+        </div>
+      )}
+
+      <div className="ticket-table-wrap">
+        <div className="ticket-table ticket-table-header" role="row">
+          <span>Ticket</span><span>Priority</span><span>Status</span><span>Assignee</span><span>Created</span><span aria-hidden="true" />
+        </div>
+        {loading ? (
+          <div className="table-state" role="status"><span className="loading-dot" /> Loading tickets…</div>
+        ) : !error && tickets.length === 0 ? (
+          <div className="table-state empty-state">
+            <span className="empty-mark"><Search size={20} aria-hidden="true" /></span>
+            <strong>No tickets found</strong>
+            <span>Try a different search or create a ticket.</span>
+            <button className="button button-secondary" onClick={onCreate}><Plus size={16} aria-hidden="true" /> New ticket</button>
+          </div>
+        ) : (
+          tickets.map((ticket) => (
+            <a className="ticket-table ticket-row" role="row" href={`#/tickets/${ticket.id}`} key={ticket.id}>
+              <span className="ticket-name-cell">
+                <strong>{ticket.title}</strong>
+                <code>{ticket.id}</code>
+              </span>
+              <span><span className={`priority-tag priority-${ticket.priority.toLowerCase()}`}>{ticket.priority}</span></span>
+              <span><span className={`status-tag status-${ticket.status.toLowerCase()}`}>{ticket.status.replace('_', ' ')}</span></span>
+              <span className="assignee-cell">{ticket.assignee || <span className="muted">Unassigned</span>}</span>
+              <span className="date-cell">{formatDate(ticket.createdAt)}</span>
+              <span className="row-arrow"><ArrowUpRight size={16} aria-hidden="true" /></span>
+            </a>
+          ))
+        )}
+      </div>
+      <div className="table-footnote"><span className="live-indicator" /> Live from the support queue</div>
+    </section>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketForm.jsx**</summary>
+
+@@ lines 1-1 @@
+
+```
+import { ArrowLeft, Save } from 'lucide-react';
+
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+const EMPTY_TICKET = {
+  title: '',
+  description: '',
+  priority: '',
+  assignee: '',
+};
+
+export default function TicketForm({
+  mode,
+  initialValue = EMPTY_TICKET,
+  busy = false,
+  errorMessage = '',
+  fieldErrors = {},
+  onSubmit,
+  onCancel,
+}) {
+  const isEditing = mode === 'edit';
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSubmit({
+      title: initialValue.title,
+      description: initialValue.description,
+      priority: initialValue.priority,
+      assignee: initialValue.assignee ?? '',
+    });
+  }
+
+  return (
+    <form className="ticket-form" onSubmit={handleSubmit}>
+      {errorMessage && (
+        <div className="notice notice-error" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
+      <div className="form-grid">
+        <label className="field field-wide">
+          <span>Title <span className="required-mark">Required</span></span>
+          <input
+            name="title"
+            value={initialValue.title}
+            onChange={onSubmit.changeField}
+            maxLength={200}
+            required
+            autoFocus
+          />
+          {fieldErrors.title && <span className="field-error">{fieldErrors.title}</span>}
+        </label>
+
+        <label className="field field-wide">
+          <span>Description <span className="required-mark">Required</span></span>
+          <textarea
+            name="description"
+            value={initialValue.description}
+            onChange={onSubmit.changeField}
+            maxLength={2000}
+            rows={5}
+            required
+          />
+          {fieldErrors.description && <span className="field-error">{fieldErrors.description}</span>}
+          <span className="field-hint">{initialValue.description.length}/2000</span>
+        </label>
+
+        <label className="field">
+          <span>Priority <span className="required-mark">Required</span></span>
+          <select name="priority" value={initialValue.priority} onChange={onSubmit.changeField} required>
+            <option value="" disabled>Select priority</option>
+            {PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+          </select>
+          {fieldErrors.priority && <span className="field-error">{fieldErrors.priority}</span>}
+        </label>
+
+        <label className="field">
+          <span>Assignee <span className="optional-mark">Optional</span></span>
+          <input
+            name="assignee"
+            value={initialValue.assignee ?? ''}
+            onChange={onSubmit.changeField}
+            placeholder="Team or person"
+          />
+          {fieldErrors.assignee && <span className="field-error">{fieldErrors.assignee}</span>}
+        </label>
+      </div>
+
+      <div className="form-actions">
+        <button className="button button-quiet" type="button" onClick={onCancel} disabled={busy}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          Cancel
+        </button>
+        <button className="button button-primary" type="submit" disabled={busy}>
+          <Save size={16} aria-hidden="true" />
+          {busy ? 'Saving…' : isEditing ? 'Save changes' : 'Create ticket'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketListPage.jsx**</summary>
+
+@@ lines 1-1 @@
+
+```
+import { useEffect, useState } from 'react';
+import { ArrowUpRight, Plus, RotateCw, Search } from 'lucide-react';
+import { listTickets, userMessageFor } from './api.js';
+
+const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'CANCELLED'];
+
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+  }).format(date);
+}
+
+export default function TicketListPage({ onCreate }) {
+  const [tickets, setTickets] = useState([]);
+  const [draftKeyword, setDraftKeyword] = useState('');
+  const [draftStatus, setDraftStatus] = useState('');
+  const [filters, setFilters] = useState({ keyword: '', status: '' });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    listTickets(filters)
+      .then((results) => { if (active) setTickets(results); })
+      .catch((requestError) => { if (active) setError(requestError); })
+      .finally(() => { if (active) setLoading(false); });
+
+    return () => { active = false; };
+  }, [filters, refreshKey]);
+
+  function applyFilters(event) {
+    event.preventDefault();
+    setFilters({ keyword: draftKeyword, status: draftStatus });
+  }
+
+  function clearFilters() {
+    setDraftKeyword('');
+    setDraftStatus('');
+    setFilters({ keyword: '', status: '' });
+  }
+
+  return (
+    <section className="page-section" aria-labelledby="tickets-heading">
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">QUEUE / ALL TICKETS</p>
+          <h1 id="tickets-heading">Tickets</h1>
+          <p className="page-subtitle">Track requests and move work forward.</p>
+        </div>
+        <button className="button button-primary" onClick={onCreate}>
+          <Plus size={17} aria-hidden="true" /> New ticket
+        </button>
+      </div>
+
+      <form className="filter-bar" onSubmit={applyFilters}>
+        <label className="search-field">
+          <Search size={17} aria-hidden="true" />
+          <span className="visually-hidden">Search tickets</span>
+          <input
+            value={draftKeyword}
+            onChange={(event) => setDraftKeyword(event.target.value)}
+            placeholder="Search title or description"
+          />
+        </label>
+        <label className="filter-status">
+          <span className="visually-hidden">Filter by status</span>
+          <select value={draftStatus} onChange={(event) => setDraftStatus(event.target.value)}>
+            <option value="">All statuses</option>
+            {STATUSES.map((status) => <option value={status} key={status}>{status.replace('_', ' ')}</option>)}
+          </select>
+        </label>
+        <button className="button button-dark" type="submit">Apply filters</button>
+        {(filters.keyword || filters.status) && (
+          <button className="button button-quiet clear-filter" type="button" onClick={clearFilters}>Clear</button>
+        )}
+        <span className="result-count" aria-live="polite">
+          {loading ? 'Updating…' : `${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`}
+        </span>
+      </form>
+
+      {error && (
+        <div className="notice notice-error" role="alert">
+          <span>{userMessageFor(error, 'Tickets could not be loaded. Please try again.')}</span>
+          <button className="button button-small button-quiet" onClick={() => setRefreshKey((key) => key + 1)}>
+            <RotateCw size={15} aria-hidden="true" /> Retry
+          </button>
+        </div>
+      )}
+
+      <div className="ticket-table-wrap">
+        <div className="ticket-table ticket-table-header" role="row">
+          <span>Ticket</span><span>Priority</span><span>Status</span><span>Assignee</span><span>Created</span><span aria-hidden="true" />
+        </div>
+        {loading ? (
+          <div className="table-state" role="status"><span className="loading-dot" /> Loading tickets…</div>
+        ) : !error && tickets.length === 0 ? (
+          <div className="table-state empty-state">
+            <span className="empty-mark"><Search size={20} aria-hidden="true" /></span>
+            <strong>No tickets found</strong>
+            <span>Try a different search or create a ticket.</span>
+            <button className="button button-secondary" onClick={onCreate}><Plus size={16} aria-hidden="true" /> New ticket</button>
+          </div>
+        ) : (
+          tickets.map((ticket) => (
+            <a className="ticket-table ticket-row" role="row" href={`#/tickets/${ticket.id}`} key={ticket.id}>
+              <span className="ticket-name-cell">
+                <strong>{ticket.title}</strong>
+                <code>{ticket.id}</code>
+              </span>
+              <span><span className={`priority-tag priority-${ticket.priority.toLowerCase()}`}>{ticket.priority}</span></span>
+              <span><span className={`status-tag status-${ticket.status.toLowerCase()}`}>{ticket.status.replace('_', ' ')}</span></span>
+              <span className="assignee-cell">{ticket.assignee || <span className="muted">Unassigned</span>}</span>
+              <span className="date-cell">{formatDate(ticket.createdAt)}</span>
+              <span className="row-arrow"><ArrowUpRight size={16} aria-hidden="true" /></span>
+            </a>
+          ))
+        )}
+      </div>
+      <div className="table-footnote"><span className="live-indicator" /> Live from the support queue</div>
+    </section>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The scaffold and first two UI modules are written. I spotted a form wiring mismatch while reviewing the new code (`onSubmit` was being treated as both a callback and field handler); I’ll fix that before the full build, but first I’m checking dependency installation for this new subproject.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` npm install`
+
+Install React, Vite, and Lucide dependencies for the new frontend workspace.
+
+```bash
+npm install
+```
+
+**Result:**
+
+```
+npm error code ENOENT
+npm error syscall open
+npm error path /home/sandeep/Desktop/c2_project/c2JiraTicket/package.json
+npm error errno -2
+npm error enoent Could not read package.json: Error: ENOENT: no such file or dir
+ectory, open '/home/sandeep/Desktop/c2_project/c2JiraTicket/package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /home/sandeep/.npm/_logs/2
+026-09-27T13_16_12_799Z-debug-0.log
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The install command ran from the repository root, where no `package.json` exists; the frontend 
+
+The install command ran from the repository root, where no `package.json` exists; the frontend manifest is correctly under `frontend`. I’m rerunning the same install from that subdirectory.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` cd frontend && npm install`
+
+Install the frontend dependencies from the new frontend project directory.
+
+```bash
+cd frontend && npm install
+```
+
+**Result:**
+
+```
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  cd frontend && npm
+install
+
+added 65 packages, and audited 66 packages in 18s
+
+9 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Dependencies installed cleanly with no audit vulnerabilities. I’m correcting the shared form so it owns its values and calls the parent only on submit; next I’ll wire the list/detail pages and hash-based navigation, then run the Vite build.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketForm.jsx**</summary>
+
+@@ lines 1-106 @@
+
+```
+import { useState } from 'react';
+import { ArrowLeft, Save } from 'lucide-react';
+
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+const EMPTY_TICKET = {
+  title: '',
+  description: '',
+  priority: '',
+  assignee: '',
+};
+
+export default function TicketForm({
+  mode,
+  initialValue = EMPTY_TICKET,
+  busy = false,
+  errorMessage = '',
+  fieldErrors = {},
+  onSubmit,
+  onCancel,
+}) {
+  const isEditing = mode === 'edit';
+  const [values, setValues] = useState(() => ({ ...EMPTY_TICKET, ...initialValue }));
+
+  function changeField(event) {
+    const { name, value } = event.target;
+    setValues((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSubmit({ ...values, assignee: values.assignee ?? '' });
+  }
+
+  return (
+    <form className="ticket-form" onSubmit={handleSubmit}>
+      {errorMessage && (
+        <div className="notice notice-error" role="alert">
+          {errorMessage}
+        </div>
+      )}
+
+      <div className="form-grid">
+        <label className="field field-wide">
+          <span>Title <span className="required-mark">Required</span></span>
+          <input
+            name="title"
+            value={values.title}
+            onChange={changeField}
+            maxLength={200}
+            required
+            autoFocus
+          />
+          {fieldErrors.title && <span className="field-error">{fieldErrors.title}</span>}
+        </label>
+
+        <label className="field field-wide">
+          <span>Description <span className="required-mark">Required</span></span>
+          <textarea
+            name="description"
+            value={values.description}
+            onChange={changeField}
+            maxLength={2000}
+            rows={5}
+            required
+          />
+          {fieldErrors.description && <span className="field-error">{fieldErrors.description}</span>}
+          <span className="field-hint">{values.description.length}/2000</span>
+        </label>
+
+        <label className="field">
+          <span>Priority <span className="required-mark">Required</span></span>
+          <select name="priority" value={values.priority} onChange={changeField} required>
+            <option value="" disabled>Select priority</option>
+            {PRIORITIES.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
+          </select>
+          {fieldErrors.priority && <span className="field-error">{fieldErrors.priority}</span>}
+        </label>
+
+        <label className="field">
+          <span>Assignee <span className="optional-mark">Optional</span></span>
+          <input
+            name="assignee"
+            value={values.assignee ?? ''}
+            onChange={changeField}
+            placeholder="Team or person"
+          />
+          {fieldErrors.assignee && <span className="field-error">{fieldErrors.assignee}</span>}
+        </label>
+      </div>
+
+      <div className="form-actions">
+        <button className="button button-quiet" type="button" onClick={onCancel} disabled={busy}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          Cancel
+        </button>
+        <button className="button button-primary" type="submit" disabled={busy}>
+          <Save size={16} aria-hidden="true" />
+          {busy ? 'Saving…' : isEditing ? 'Save changes' : 'Create ticket'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The form state bug is fixed. I’m implementing the ticket detail page with status actions exactly matching the state-machine table, comment submission followed by a detail refresh, and conflict-triggered reload; then I’ll connect list/create/edit/detail navigation in the app shell.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `TicketDetailPage.jsx`
+
+**Input:**
+
+- content:
+
+```
+import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, Clock3, MessageCircle, Pencil, RotateCw, Send, Workflow } from 'lucide-react';
+import { addComment, changeTicketStatus, getTicket, userMessageFor } from './api.js';
+
+const NEXT_STATUSES = {
+  OPEN: ['IN_PROGRESS', 'CANCELLED'],
+  IN_PROGRESS: ['RESOLVED', 'CANCELLED'],
+  RESOLVED: ['CLOSED'],
+  CLOSED: [],
+  CANCELLED: [],
+};
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium', timeStyle: 'short',
+  }).format(date);
+}
+
+export default function TicketDetailPage({ ticketId, onBack, onEdit }) {
+  const [ticket, setTicket] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [transitionBusy, setTransitionBusy] = useState(false);
+  const [comment, setComment] = useState({ author: '', content: '' });
+  const [commentErrors, setCommentErrors] = useState({});
+  const [commentBusy, setCommentBusy] = useState(false);
+
+  const loadTicket = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setTicket(await getTicket(ticketId));
+    } catch (error) {
+      setLoadError(error);
+      setTicket(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [ticketId]);
+
+  useEffect(() => { loadTicket(); }, [loadTicket]);
+
+  async function handleTransition(status) {
+    setTransitionBusy(true);
+    setActionError('');
+    try {
+      setTicket(await changeTicketStatus(ticketId, status));
+    } catch (error) {
+      setActionError(userMessageFor(error, 'The status could not be changed.'));
+      if (error.code === 'INVALID_STATUS_TRANSITION') await loadTicket();
+    } finally {
+      setTransitionBusy(false);
+    }
+  }
+
+  async function handleCommentSubmit(event) {
+    event.preventDefault();
+    setCommentBusy(true);
+    setCommentErrors({});
+    setActionError('');
+    try {
+      await addComment(ticketId, comment);
+      setComment({ author: '', content: '' });
+      await loadTicket();
+    } catch (error) {
+      setCommentErrors(error.errors || {});
+      setActionError(userMessageFor(error, 'The comment could not be added.'));
+      if (error.code === 'NOT_FOUND') await loadTicket();
+    } finally {
+      setCommentBusy(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="page-loading" role="status"><span className="loading-dot" /> Loading ticket…</div>;
+  }
+
+  if (!ticket) {
+    return (
+      <section className="page-section state-page">
+        <button className="button button-quiet" onClick={onBack}><ArrowLeft size={16} /> All tickets</button>
+        <div className="state-card">
+          <span className="eyebrow">TICKET UNAVAILABLE</span>
+          <h1>{loadError?.status === 404 ? 'Ticket not found' : 'Ticket could not be loaded'}</h1>
+          <p>{userMessageFor(loadError, 'Try loading the ticket again.')}</p>
+          <div className="state-actions">
+            <button className="button button-secondary" onClick={loadTicket}><RotateCw size={15} /> Retry</button>
+            <button className="button button-quiet" onClick={onBack}>Back to tickets</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const transitions = NEXT_STATUSES[ticket.status] || [];
+
+  return (
+    <section className="page-section detail-page" aria-labelledby="detail-title">
+      <div className="detail-topline">
+        <button className="button button-quiet back-link" onClick={onBack}><ArrowLeft size={16} /> All tickets</button>
+        <span className="detail-id">TICKET <code>{ticket.id}</code></span>
+      </div>
+
+      {actionError && <div className="notice notice-error" role="alert">{actionError}</div>}
+
+      <header className="detail-heading">
+        <div className="detail-heading-copy">
+          <div className="detail-tags">
+            <span className={`priority-tag priority-${ticket.priority.toLowerCase()}`}>{ticket.priority}</span>
+            <span className={`status-tag status-${ticket.status.toLowerCase()}`}>{ticket.status.replace('_', ' ')}</span>
+          </div>
+          <h1 id="detail-title">{ticket.title}</h1>
+        </div>
+        <button className="button button-secondary" onClick={() => onEdit(ticket)}>
+          <Pencil size={16} aria-hidden="true" /> Edit ticket
+        </button>
+      </header>
+
+      <div className="detail-grid">
+        <article className="detail-main">
+          <section className="content-section">
+            <h2>Description</h2>
+            <p className="description-text">{ticket.description}</p>
+          </section>
+
+          <section className="content-section comments-section">
+            <div className="section-heading-row">
+              <div>
+                <p className="eyebrow">CONVERSATION</p>
+                <h2><MessageCircle size={18} aria-hidden="true" /> Comments <span className="section-count">{ticket.comments?.length || 0}</span></h2>
+              </div>
+            </div>
+
+            <div className="comment-list">
+              {ticket.comments?.length ? ticket.comments.map((item) => (
+                <article className="comment-item" key={item.id}>
+                  <div className="comment-marker" aria-hidden="true">{item.author.trim().charAt(0).toUpperCase() || '?'}</div>
+                  <div className="comment-body">
+                    <div className="comment-meta"><strong>{item.author}</strong><time dateTime={item.createdAt}>{formatDateTime(item.createdAt)}</time></div>
+                    <p>{item.content}</p>
+                  </div>
+                </article>
+              )) : (
+                <div className="comments-empty">No comments yet. Add the first update below.</div>
+              )}
+            </div>
+
+            <form className="comment-form" onSubmit={handleCommentSubmit}>
+              <label className="field">
+                <span>Author <span className="required-mark">Required</span></span>
+                <input
+                  value={comment.author}
+                  onChange={(event) => setComment((current) => ({ ...current, author: event.target.value }))}
+                  required
+                  aria-invalid={Boolean(commentErrors.author)}
+                />
+                {commentErrors.author && <span className="field-error">{commentErrors.author}</span>}
+              </label>
+              <label className="field">
+                <span>Comment <span className="required-mark">Required</span></span>
+                <textarea
+                  value={comment.content}
+                  onChange={(event) => setComment((current) => ({ ...current, content: event.target.value }))}
+                  maxLength={1000}
+                  rows={3}
+                  required
+                  aria-invalid={Boolean(commentErrors.content)}
+                />
+                {commentErrors.content && <span className="field-error">{commentErrors.content}</span>}
+                <span className="field-hint">{comment.content.length}/1000</span>
+              </label>
+              <div className="form-actions form-actions-end">
+                <button className="button button-primary" type="submit" disabled={commentBusy}>
+                  <Send size={15} aria-hidden="true" /> {commentBusy ? 'Sending…' : 'Add comment'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </article>
+
+        <aside className="detail-aside">
+          <section className="aside-section">
+            <h2>Ticket information</h2>
+            <dl className="ticket-facts">
+              <div><dt>Assignee</dt><dd>{ticket.assignee || 'Unassigned'}</dd></div>
+              <div><dt>Created</dt><dd><Clock3 size={14} /> {formatDateTime(ticket.createdAt)}</dd></div>
+              <div><dt>Updated</dt><dd><Clock3 size={14} /> {formatDateTime(ticket.updatedAt)}</dd></div>
+            </dl>
+          </section>
+
+          <section className="aside-section transition-section">
+            <div className="aside-heading-icon"><Workflow size={17} aria-hidden="true" /><h2>Change status</h2></div>
+            {transitions.length ? (
+              <div className="transition-actions">
+                {transitions.map((status) => (
+                  <button key={status} className="transition-button" disabled={transitionBusy} onClick={() => handleTransition(status)}>
+                    {transitionBusy ? 'Updating…' : status.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="terminal-note">This ticket is in a terminal status.</p>
+            )}
+            <p className="service-note">Status changes are checked by the support service.</p>
+          </section>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketDetailPage.jsx`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketDetailPage.jsx
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `App.jsx`
+
+**Input:**
+
+- content:
+
+```
+import { useEffect, useState } from 'react';
+import { CircleHelp, LifeBuoy, Plus, TicketCheck } from 'lucide-react';
+import { createTicket, getTicket, updateTicket, userMessageFor } from './api.js';
+import TicketDetailPage from './TicketDetailPage.jsx';
+import TicketForm from './TicketForm.jsx';
+import TicketListPage from './TicketListPage.jsx';
+
+function readRoute() {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const parts = hash.split('/').filter(Boolean);
+  if (parts[0] !== 'tickets' || parts.length === 1) return { page: 'list' };
+  if (parts[1] === 'new') return { page: 'create' };
+  if (parts[2] === 'edit') return { page: 'edit', ticketId: decodeURIComponent(parts[1]) };
+  return { page: 'detail', ticketId: decodeURIComponent(parts[1]) };
+}
+
+function navigate(path) {
+  window.location.hash = path;
+}
+
+function TicketEditorPage({ mode, ticketId, onCancel, onSaved }) {
+  const [ticket, setTicket] = useState(null);
+  const [loading, setLoading] = useState(mode === 'edit');
+  const [loadError, setLoadError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    if (mode !== 'edit') return undefined;
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
+    getTicket(ticketId)
+      .then((result) => { if (active) setTicket(result); })
+      .catch((error) => { if (active) setLoadError(error); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [mode, ticketId, retryKey]);
+
+  async function handleSubmit(fields) {
+    setSaving(true);
+    setErrorMessage('');
+    setFieldErrors({});
+    try {
+      const saved = mode === 'edit'
+        ? await updateTicket(ticketId, fields)
+        : await createTicket(fields);
+      onSaved(saved.id);
+    } catch (error) {
+      setFieldErrors(error.errors || {});
+      setErrorMessage(userMessageFor(error, mode === 'edit'
+        ? 'Ticket changes could not be saved.'
+        : 'Ticket could not be created.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="page-loading" role="status">Loading ticket details…</div>;
+  if (loadError) {
+    return (
+      <section className="page-section state-page">
+        <div className="state-card">
+          <span className="eyebrow">{loadError.status === 404 ? 'TICKET UNAVAILABLE' : 'LOAD ERROR'}</span>
+          <h1>{loadError.status === 404 ? 'Ticket not found' : 'Ticket could not be loaded'}</h1>
+          <p>{userMessageFor(loadError, 'Try loading the ticket again.')}</p>
+          <div className="state-actions">
+            <button className="button button-secondary" onClick={() => setRetryKey((key) => key + 1)}>Retry</button>
+            <button className="button button-quiet" onClick={onCancel}>Back</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="page-section editor-page">
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">{mode === 'edit' ? 'TICKET / EDIT' : 'TICKETS / NEW'}</p>
+          <h1>{mode === 'edit' ? 'Edit ticket' : 'Create ticket'}</h1>
+          <p className="page-subtitle">{mode === 'edit' ? 'Update the request details.' : 'Capture the issue and route it to the right team.'}</p>
+        </div>
+      </div>
+      <div className="form-sheet">
+        <TicketForm
+          mode={mode}
+          initialValue={ticket || undefined}
+          busy={saving}
+          errorMessage={errorMessage}
+          fieldErrors={fieldErrors}
+          onSubmit={handleSubmit}
+          onCancel={onCancel}
+        />
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const [route, setRoute] = useState(readRoute);
+
+  useEffect(() => {
+    const updateRoute = () => setRoute(readRoute());
+    window.addEventListener('hashchange', updateRoute);
+    return () => window.removeEventListener('hashchange', updateRoute);
+  }, []);
+
+  function openTickets() { navigate('/tickets'); }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="#/tickets" aria-label="Support Desk tickets">
+          <span className="brand-mark"><LifeBuoy size={21} aria-hidden="true" /></span>
+          <span className="brand-name">Support<span>Desk</span></span>
+        </a>
+        <nav className="top-nav" aria-label="Main navigation">
+          <a className={route.page === 'list' ? 'nav-link active' : 'nav-link'} href="#/tickets"><TicketCheck size={16} /> Tickets</a>
+        </nav>
+        <div className="topbar-right">
+          <span className="workspace-label"><span className="workspace-dot" /> Support workspace</span>
+          <button className="icon-button" aria-label="Help" title="Help"><CircleHelp size={18} /></button>
+        </div>
+      </header>
+
+      <main className="main-shell">
+        {route.page === 'list' && <TicketListPage onCreate={() => navigate('/tickets/new')} />}
+        {route.page === 'create' && (
+          <TicketEditorPage mode="create" onCancel={openTickets} onSaved={(id) => navigate(`/tickets/${id}`)} />
+        )}
+        {route.page === 'edit' && (
+          <TicketEditorPage mode="edit" ticketId={route.ticketId} onCancel={() => navigate(`/tickets/${route.ticketId}`)} onSaved={(id) => navigate(`/tickets/${id}`)} />
+        )}
+        {route.page === 'detail' && (
+          <TicketDetailPage ticketId={route.ticketId} onBack={openTickets} onEdit={() => navigate(`/tickets/${route.ticketId}/edit`)} />
+        )}
+      </main>
+
+      <footer className="app-footer">
+        <span>Support operations</span>
+        <span className="footer-separator" />
+        <span>Ticket management</span>
+        {route.page === 'list' && <button onClick={() => navigate('/tickets/new')}><Plus size={14} /> New ticket</button>}
+      </footer>
+    </div>
+  );
+}
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/App.jsx`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/App.jsx
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketDetailPage.jsx**</summary>
+
+@@ lines 1-1 @@
+
+```
+import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, Clock3, MessageCircle, Pencil, RotateCw, Send, Workflow } from 'lucide-react';
+import { addComment, changeTicketStatus, getTicket, userMessageFor } from './api.js';
+
+const NEXT_STATUSES = {
+  OPEN: ['IN_PROGRESS', 'CANCELLED'],
+  IN_PROGRESS: ['RESOLVED', 'CANCELLED'],
+  RESOLVED: ['CLOSED'],
+  CLOSED: [],
+  CANCELLED: [],
+};
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium', timeStyle: 'short',
+  }).format(date);
+}
+
+export default function TicketDetailPage({ ticketId, onBack, onEdit }) {
+  const [ticket, setTicket] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [transitionBusy, setTransitionBusy] = useState(false);
+  const [comment, setComment] = useState({ author: '', content: '' });
+  const [commentErrors, setCommentErrors] = useState({});
+  const [commentBusy, setCommentBusy] = useState(false);
+
+  const loadTicket = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setTicket(await getTicket(ticketId));
+    } catch (error) {
+      setLoadError(error);
+      setTicket(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [ticketId]);
+
+  useEffect(() => { loadTicket(); }, [loadTicket]);
+
+  async function handleTransition(status) {
+    setTransitionBusy(true);
+    setActionError('');
+    try {
+      setTicket(await changeTicketStatus(ticketId, status));
+    } catch (error) {
+      setActionError(userMessageFor(error, 'The status could not be changed.'));
+      if (error.code === 'INVALID_STATUS_TRANSITION') await loadTicket();
+    } finally {
+      setTransitionBusy(false);
+    }
+  }
+
+  async function handleCommentSubmit(event) {
+    event.preventDefault();
+    setCommentBusy(true);
+    setCommentErrors({});
+    setActionError('');
+    try {
+      await addComment(ticketId, comment);
+      setComment({ author: '', content: '' });
+      await loadTicket();
+    } catch (error) {
+      setCommentErrors(error.errors || {});
+      setActionError(userMessageFor(error, 'The comment could not be added.'));
+      if (error.code === 'NOT_FOUND') await loadTicket();
+    } finally {
+      setCommentBusy(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="page-loading" role="status"><span className="loading-dot" /> Loading ticket…</div>;
+  }
+
+  if (!ticket) {
+    return (
+      <section className="page-section state-page">
+        <button className="button button-quiet" onClick={onBack}><ArrowLeft size={16} /> All tickets</button>
+        <div className="state-card">
+          <span className="eyebrow">TICKET UNAVAILABLE</span>
+          <h1>{loadError?.status === 404 ? 'Ticket not found' : 'Ticket could not be loaded'}</h1>
+          <p>{userMessageFor(loadError, 'Try loading the ticket again.')}</p>
+          <div className="state-actions">
+            <button className="button button-secondary" onClick={loadTicket}><RotateCw size={15} /> Retry</button>
+            <button className="button button-quiet" onClick={onBack}>Back to tickets</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const transitions = NEXT_STATUSES[ticket.status] || [];
+
+  return (
+    <section className="page-section detail-page" aria-labelledby="detail-title">
+      <div className="detail-topline">
+        <button className="button button-quiet back-link" onClick={onBack}><ArrowLeft size={16} /> All tickets</button>
+        <span className="detail-id">TICKET <code>{ticket.id}</code></span>
+      </div>
+
+      {actionError && <div className="notice notice-error" role="alert">{actionError}</div>}
+
+      <header className="detail-heading">
+        <div className="detail-heading-copy">
+          <div className="detail-tags">
+            <span className={`priority-tag priority-${ticket.priority.toLowerCase()}`}>{ticket.priority}</span>
+            <span className={`status-tag status-${ticket.status.toLowerCase()}`}>{ticket.status.replace('_', ' ')}</span>
+          </div>
+          <h1 id="detail-title">{ticket.title}</h1>
+        </div>
+        <button className="button button-secondary" onClick={() => onEdit(ticket)}>
+          <Pencil size={16} aria-hidden="true" /> Edit ticket
+        </button>
+      </header>
+
+      <div className="detail-grid">
+        <article className="detail-main">
+          <section className="content-section">
+            <h2>Description</h2>
+            <p className="description-text">{ticket.description}</p>
+          </section>
+
+          <section className="content-section comments-section">
+            <div className="section-heading-row">
+              <div>
+                <p className="eyebrow">CONVERSATION</p>
+                <h2><MessageCircle size={18} aria-hidden="true" /> Comments <span className="section-count">{ticket.comments?.length || 0}</span></h2>
+              </div>
+            </div>
+
+            <div className="comment-list">
+              {ticket.comments?.length ? ticket.comments.map((item) => (
+                <article className="comment-item" key={item.id}>
+                  <div className="comment-marker" aria-hidden="true">{item.author.trim().charAt(0).toUpperCase() || '?'}</div>
+                  <div className="comment-body">
+                    <div className="comment-meta"><strong>{item.author}</strong><time dateTime={item.createdAt}>{formatDateTime(item.createdAt)}</time></div>
+                    <p>{item.content}</p>
+                  </div>
+                </article>
+              )) : (
+                <div className="comments-empty">No comments yet. Add the first update below.</div>
+              )}
+            </div>
+
+            <form className="comment-form" onSubmit={handleCommentSubmit}>
+              <label className="field">
+                <span>Author <span className="required-mark">Required</span></span>
+                <input
+                  value={comment.author}
+                  onChange={(event) => setComment((current) => ({ ...current, author: event.target.value }))}
+                  required
+                  aria-invalid={Boolean(commentErrors.author)}
+                />
+                {commentErrors.author && <span className="field-error">{commentErrors.author}</span>}
+              </label>
+              <label className="field">
+                <span>Comment <span className="required-mark">Required</span></span>
+                <textarea
+                  value={comment.content}
+                  onChange={(event) => setComment((current) => ({ ...current, content: event.target.value }))}
+                  maxLength={1000}
+                  rows={3}
+                  required
+                  aria-invalid={Boolean(commentErrors.content)}
+                />
+                {commentErrors.content && <span className="field-error">{commentErrors.content}</span>}
+                <span className="field-hint">{comment.content.length}/1000</span>
+              </label>
+              <div className="form-actions form-actions-end">
+                <button className="button button-primary" type="submit" disabled={commentBusy}>
+                  <Send size={15} aria-hidden="true" /> {commentBusy ? 'Sending…' : 'Add comment'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </article>
+
+        <aside className="detail-aside">
+          <section className="aside-section">
+            <h2>Ticket information</h2>
+            <dl className="ticket-facts">
+              <div><dt>Assignee</dt><dd>{ticket.assignee || 'Unassigned'}</dd></div>
+              <div><dt>Created</dt><dd><Clock3 size={14} /> {formatDateTime(ticket.createdAt)}</dd></div>
+              <div><dt>Updated</dt><dd><Clock3 size={14} /> {formatDateTime(ticket.updatedAt)}</dd></div>
+            </dl>
+          </section>
+
+          <section className="aside-section transition-section">
+            <div className="aside-heading-icon"><Workflow size={17} aria-hidden="true" /><h2>Change status</h2></div>
+            {transitions.length ? (
+              <div className="transition-actions">
+                {transitions.map((status) => (
+                  <button key={status} className="transition-button" disabled={transitionBusy} onClick={() => handleTransition(status)}>
+                    {transitionBusy ? 'Updating…' : status.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="terminal-note">This ticket is in a terminal status.</p>
+            )}
+            <p className="service-note">Status changes are checked by the support service.</p>
+          </section>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **App.jsx**</summary>
+
+@@ lines 1-1 @@
+
+```
+import { useEffect, useState } from 'react';
+import { CircleHelp, LifeBuoy, Plus, TicketCheck } from 'lucide-react';
+import { createTicket, getTicket, updateTicket, userMessageFor } from './api.js';
+import TicketDetailPage from './TicketDetailPage.jsx';
+import TicketForm from './TicketForm.jsx';
+import TicketListPage from './TicketListPage.jsx';
+
+function readRoute() {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const parts = hash.split('/').filter(Boolean);
+  if (parts[0] !== 'tickets' || parts.length === 1) return { page: 'list' };
+  if (parts[1] === 'new') return { page: 'create' };
+  if (parts[2] === 'edit') return { page: 'edit', ticketId: decodeURIComponent(parts[1]) };
+  return { page: 'detail', ticketId: decodeURIComponent(parts[1]) };
+}
+
+function navigate(path) {
+  window.location.hash = path;
+}
+
+function TicketEditorPage({ mode, ticketId, onCancel, onSaved }) {
+  const [ticket, setTicket] = useState(null);
+  const [loading, setLoading] = useState(mode === 'edit');
+  const [loadError, setLoadError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    if (mode !== 'edit') return undefined;
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
+    getTicket(ticketId)
+      .then((result) => { if (active) setTicket(result); })
+      .catch((error) => { if (active) setLoadError(error); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [mode, ticketId, retryKey]);
+
+  async function handleSubmit(fields) {
+    setSaving(true);
+    setErrorMessage('');
+    setFieldErrors({});
+    try {
+      const saved = mode === 'edit'
+        ? await updateTicket(ticketId, fields)
+        : await createTicket(fields);
+      onSaved(saved.id);
+    } catch (error) {
+      setFieldErrors(error.errors || {});
+      setErrorMessage(userMessageFor(error, mode === 'edit'
+        ? 'Ticket changes could not be saved.'
+        : 'Ticket could not be created.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="page-loading" role="status">Loading ticket details…</div>;
+  if (loadError) {
+    return (
+      <section className="page-section state-page">
+        <div className="state-card">
+          <span className="eyebrow">{loadError.status === 404 ? 'TICKET UNAVAILABLE' : 'LOAD ERROR'}</span>
+          <h1>{loadError.status === 404 ? 'Ticket not found' : 'Ticket could not be loaded'}</h1>
+          <p>{userMessageFor(loadError, 'Try loading the ticket again.')}</p>
+          <div className="state-actions">
+            <button className="button button-secondary" onClick={() => setRetryKey((key) => key + 1)}>Retry</button>
+            <button className="button button-quiet" onClick={onCancel}>Back</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="page-section editor-page">
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">{mode === 'edit' ? 'TICKET / EDIT' : 'TICKETS / NEW'}</p>
+          <h1>{mode === 'edit' ? 'Edit ticket' : 'Create ticket'}</h1>
+          <p className="page-subtitle">{mode === 'edit' ? 'Update the request details.' : 'Capture the issue and route it to the right team.'}</p>
+        </div>
+      </div>
+      <div className="form-sheet">
+        <TicketForm
+          mode={mode}
+          initialValue={ticket || undefined}
+          busy={saving}
+          errorMessage={errorMessage}
+          fieldErrors={fieldErrors}
+          onSubmit={handleSubmit}
+          onCancel={onCancel}
+        />
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const [route, setRoute] = useState(readRoute);
+
+  useEffect(() => {
+    const updateRoute = () => setRoute(readRoute());
+    window.addEventListener('hashchange', updateRoute);
+    return () => window.removeEventListener('hashchange', updateRoute);
+  }, []);
+
+  function openTickets() { navigate('/tickets'); }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="#/tickets" aria-label="Support Desk tickets">
+          <span className="brand-mark"><LifeBuoy size={21} aria-hidden="true" /></span>
+          <span className="brand-name">Support<span>Desk</span></span>
+        </a>
+        <nav className="top-nav" aria-label="Main navigation">
+          <a className={route.page === 'list' ? 'nav-link active' : 'nav-link'} href="#/tickets"><TicketCheck size={16} /> Tickets</a>
+        </nav>
+        <div className="topbar-right">
+          <span className="workspace-label"><span className="workspace-dot" /> Support workspace</span>
+          <button className="icon-button" aria-label="Help" title="Help"><CircleHelp size={18} /></button>
+        </div>
+      </header>
+
+      <main className="main-shell">
+        {route.page === 'list' && <TicketListPage onCreate={() => navigate('/tickets/new')} />}
+        {route.page === 'create' && (
+          <TicketEditorPage mode="create" onCancel={openTickets} onSaved={(id) => navigate(`/tickets/${id}`)} />
+        )}
+        {route.page === 'edit' && (
+          <TicketEditorPage mode="edit" ticketId={route.ticketId} onCancel={() => navigate(`/tickets/${route.ticketId}`)} onSaved={(id) => navigate(`/tickets/${id}`)} />
+        )}
+        {route.page === 'detail' && (
+          <TicketDetailPage ticketId={route.ticketId} onBack={openTickets} onEdit={() => navigate(`/tickets/${route.ticketId}/edit`)} />
+        )}
+      </main>
+
+      <footer className="app-footer">
+        <span>Support operations</span>
+        <span className="footer-separator" />
+        <span>Ticket management</span>
+        {route.page === 'list' && <button onClick={() => navigate('/tickets/new')}><Plus size={14} /> New ticket</button>}
+      </footer>
+    </div>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The app shell, route handling, details, forms, status actions, and comment refresh flow are wired. I’m adding the visual system now: restrained green/ink with citrus and coral status accents, compact operational layouts, responsive ticket rows, and clear focus/loading/error states; then I’ll run the build and fix any genuine issues.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `styles.css`
+
+**Input:**
+
+- content:
+
+```
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  color: #18342d;
+  background: #f3f6f3;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #18342d;
+  --muted: #6d8079;
+  --line: #dce6e0;
+  --paper: #ffffff;
+  --mint: #e2f1e9;
+  --green: #167258;
+  --green-dark: #104f3d;
+  --lime: #c9e76f;
+  --coral: #d95f48;
+  --yellow: #f0d976;
+  --blue: #467c96;
+  --shadow: 0 14px 34px rgba(28, 67, 54, 0.07);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 340px;
+  min-height: 100vh;
+  background-color: #f3f6f3;
+  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 39px, rgba(34, 81, 65, 0.025) 40px);
+}
+
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.65; }
+a { color: inherit; text-decoration: none; }
+
+:focus-visible {
+  outline: 3px solid rgba(22, 114, 88, 0.28);
+  outline-offset: 2px;
+}
+
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+  height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding: 0 5.2vw;
+  background: rgba(255, 255, 255, 0.93);
+  border-bottom: 1px solid #dfe8e2;
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; min-width: 188px; }
+.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: #f8fff9; background: var(--green); border-radius: 8px; }
+.brand-name { font-size: 17px; line-height: 1; font-weight: 700; letter-spacing: 0; }
+.brand-name span { color: var(--green); }
+.top-nav { display: flex; align-self: stretch; align-items: stretch; }
+.nav-link { position: relative; display: inline-flex; align-items: center; gap: 9px; color: #75867f; font-size: 13px; font-weight: 600; padding: 0 14px; }
+.nav-link.active { color: var(--green-dark); }
+.nav-link.active::after { content: ''; position: absolute; bottom: -1px; left: 14px; right: 14px; height: 3px; border-radius: 4px 4px 0 0; background: var(--green); }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 19px; }
+.workspace-label { display: flex; align-items: center; gap: 8px; color: #536a61; font-size: 12px; font-weight: 600; }
+.workspace-dot, .live-indicator { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #61a876; box-shadow: 0 0 0 3px #e2f3e6; }
+.icon-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: #5d766c; }
+
+.main-shell { width: min(1250px, calc(100% - 10.4vw)); margin: 0 auto; flex: 1; padding: 48px 0 76px; }
+.page-section { width: 100%; }
+.page-heading-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 29px; }
+.eyebrow { margin: 0 0 9px; color: #799087; font-family: 'DM Mono', monospace; font-size: 10px; line-height: 1.3; font-weight: 500; letter-spacing: 0.08em; }
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 8px; color: #18342d; font-size: 32px; line-height: 1.13; font-weight: 600; letter-spacing: 0; }
+.page-subtitle { margin: 0; color: #70827b; font-size: 14px; }
+h2 { margin-bottom: 15px; color: #244137; font-size: 16px; line-height: 1.3; font-weight: 700; letter-spacing: 0; }
+
+.button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 6px; font-size: 12px; line-height: 1; font-weight: 700; transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease; }
+.button:not(:disabled):active { transform: translateY(1px); }
+.button-primary { color: #17392e; background: var(--lime); border-color: #bddc62; }
+.button-primary:hover:not(:disabled) { background: #bfe05c; }
+.button-dark { color: white; background: var(--green-dark); }
+.button-dark:hover:not(:disabled) { background: #0b4232; }
+.button-secondary { color: var(--green-dark); background: #fff; border-color: #c8d8d0; }
+.button-secondary:hover:not(:disabled) { border-color: var(--green); background: #f4faf6; }
+.button-quiet { color: #526b61; background: transparent; border-color: transparent; }
+.button-quiet:hover:not(:disabled) { color: var(--green-dark); background: #eaf2ed; }
+.button-small { min-height: 31px; padding: 0 10px; font-size: 11px; }
+
+.filter-bar { min-height: 56px; display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin-bottom: 16px; background: #e8efea; border: 1px solid #dce7df; border-radius: 7px; }
+.search-field { flex: 1 1 340px; min-width: 180px; height: 38px; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: white; border: 1px solid #dce6e0; border-radius: 5px; color: #7b8e85; }
+.search-field input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12px; }
+.search-field input::placeholder { color: #94a49d; }
+.filter-status select { min-width: 148px; height: 38px; padding: 0 28px 0 11px; border: 1px solid #dce6e0; border-radius: 5px; color: #39584b; background: white; font-size: 12px; }
+.result-count { min-width: 85px; margin-left: auto; color: #71847b; text-align: right; font-family: 'DM Mono', monospace; font-size: 10px; }
+.clear-filter { min-height: 34px; padding: 0 7px; }
+.ticket-table-wrap { overflow: hidden; background: white; border: 1px solid #dbe5df; border-radius: 7px; box-shadow: var(--shadow); }
+.ticket-table { display: grid; grid-template-columns: minmax(230px, 2.2fr) minmax(85px, 0.8fr) minmax(118px, 1fr) minmax(130px, 1.1fr) minmax(110px, 0.9fr) 28px; gap: 16px; align-items: center; padding: 0 20px; }
+.ticket-table-header { min-height: 42px; color: #85968e; background: #f8faf8; border-bottom: 1px solid #e6ede8; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+.ticket-row { min-height: 76px; border-bottom: 1px solid #edf1ee; transition: background-color 120ms ease; }
+.ticket-row:last-child { border-bottom: 0; }
+.ticket-row:hover { background: #f7fbf8; }
+.ticket-name-cell { min-width: 0; display: grid; gap: 6px; }
+.ticket-name-cell strong { overflow: hidden; color: #234338; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.ticket-name-cell code, .detail-id code { color: #8b9b94; font-family: 'DM Mono', monospace; font-size: 9px; }
+.priority-tag, .status-tag { width: fit-content; display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; }
+.priority-low { color: #456f5c; background: #e6f2e8; }
+.priority-medium { color: #85641a; background: #f8f0d4; }
+.priority-high { color: #a24d35; background: #f9e5da; }
+.priority-critical { color: #a32e3a; background: #f8dfe2; }
+.status-open { color: #246c4c; background: #e3f3e7; }
+.status-in_progress { color: #3d6d83; background: #e4f0f5; }
+.status-resolved { color: #6c5a9e; background: #eee9f7; }
+.status-closed { color: #67756f; background: #e9eeeb; }
+.status-cancelled { color: #a24d35; background: #f9e7dd; }
+.assignee-cell, .date-cell { overflow: hidden; color: #526d61; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.muted { color: #98a7a0; }
+.date-cell { font-family: 'DM Mono', monospace; font-size: 10px; }
+.row-arrow { display: grid; place-items: center; color: #83a194; }
+.table-state { min-height: 190px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #71857b; font-size: 13px; }
+.empty-state { flex-direction: column; gap: 9px; padding: 24px; text-align: center; }
+.empty-state strong { color: #29483b; font-size: 15px; }
+.empty-state > span:not(.empty-mark) { margin-bottom: 8px; font-size: 12px; }
+.empty-mark { width: 40px; height: 40px; display: grid; place-items: center; margin-bottom: 2px; border-radius: 8px; color: var(--green); background: var(--mint); }
+.loading-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px #dceddf; animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(22, 114, 88, 0.06); opacity: 0.55; } }
+.table-footnote { display: flex; align-items: center; gap: 9px; margin-top: 13px; color: #8b9a93; font-size: 10px; }
+.live-indicator { width: 6px; height: 6px; box-shadow: none; }
+
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 13px; margin: 0 0 15px; border: 1px solid; border-radius: 6px; font-size: 12px; }
+.notice-error { color: #953f37; background: #fff1ed; border-color: #f1c9bf; }
+
+.form-sheet { max-width: 790px; padding: 28px; background: #fff; border: 1px solid #dce6e0; border-radius: 7px; box-shadow: var(--shadow); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 21px 18px; }
+.field { min-width: 0; display: flex; flex-direction: column; gap: 8px; color: #36574a; font-size: 12px; font-weight: 700; }
+.field-wide { grid-column: 1 / -1; }
+.field input, .field textarea, .field select { width: 100%; min-height: 39px; padding: 9px 11px; color: #18342d; background: #fcfdfc; border: 1px solid #cfddd5; border-radius: 5px; font-size: 12px; font-weight: 400; resize: vertical; }
+.field input::placeholder, .field textarea::placeholder { color: #9aa9a2; }
+.field textarea { min-height: 112px; line-height: 1.55; }
+.required-mark, .optional-mark { margin-left: 5px; color: #a05d40; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400; }
+.optional-mark { color: #91a098; }
+.field-error { color: #a5443b; font-size: 10px; font-weight: 500; }
+.field-hint { align-self: flex-end; color: #91a098; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400; }
+.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 24px; padding-top: 17px; border-top: 1px solid #e8eee9; }
+.form-actions-end { justify-content: flex-end; margin-top: 10px; padding-top: 0; border: 0; }
+
+.detail-page { max-width: 1060px; margin: 0 auto; }
+.detail-topline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+.back-link { padding-left: 0; }
+.detail-id { display: inline-flex; align-items: center; gap: 9px; color: #90a098; font-family: 'DM Mono', monospace; font-size: 9px; }
+.detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 23px; margin-bottom: 26px; border-bottom: 1px solid #dbe5df; }
+.detail-tags { display: flex; gap: 7px; margin-bottom: 13px; }
+.detail-heading h1 { max-width: 740px; margin-bottom: 0; font-size: 30px; }
+.detail-heading .button { flex: 0 0 auto; }
+.detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 270px; align-items: start; gap: 43px; }
+.detail-main { min-width: 0; }
+.content-section { padding-bottom: 28px; margin-bottom: 26px; border-bottom: 1px solid #dbe5df; }
+.content-section h2 { display: flex; align-items: center; gap: 9px; }
+.description-text { max-width: 760px; margin-bottom: 0; color: #526d61; font-size: 13px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.section-heading-row { display: flex; align-items: flex-end; justify-content: space-between; }
+.section-heading-row .eyebrow { margin-bottom: 5px; }
+.section-heading-row h2 { margin-bottom: 0; }
+.section-count { display: inline-grid; min-width: 21px; height: 21px; place-items: center; margin-left: 3px; color: #688176; background: #e7efea; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 9px; }
+.comment-list { display: grid; margin-top: 15px; }
+.comment-item { display: grid; grid-template-columns: 31px minmax(0, 1fr); gap: 11px; padding: 16px 0; border-bottom: 1px solid #e3ebe5; }
+.comment-marker { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 7px; color: #1c644c; background: #dff0e5; font-size: 12px; font-weight: 700; }
+.comment-item:nth-child(3n + 2) .comment-marker { color: #935037; background: #f7e7dc; }
+.comment-item:nth-child(3n) .comment-marker { color: #416d84; background: #e1eef2; }
+.comment-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.comment-meta strong { color: #29483c; font-size: 11px; }
+.comment-meta time { color: #93a199; font-family: 'DM Mono', monospace; font-size: 9px; white-space: nowrap; }
+.comment-body p { margin: 6px 0 0; color: #536b60; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comments-empty { padding: 20px 0; color: #83948b; font-size: 12px; }
+.comment-form { display: grid; gap: 15px; padding: 20px; margin-top: 17px; background: rgba(255, 255, 255, 0.7); border: 1px solid #dce6e0; border-radius: 7px; }
+.comment-form .field textarea { min-height: 76px; }
+.detail-aside { border-left: 1px solid #dce6e0; padding-left: 23px; }
+.aside-section { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #dce6e0; }
+.aside-section h2 { margin-bottom: 13px; font-size: 13px; }
+.ticket-facts { display: grid; gap: 15px; margin: 0; }
+.ticket-facts div { display: grid; gap: 6px; }
+.ticket-facts dt { color: #8b9a93; font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; }
+.ticket-facts dd { display: flex; align-items: center; gap: 6px; margin: 0; color: #3d5a4e; font-size: 11px; overflow-wrap: anywhere; }
+.aside-heading-icon { display: flex; align-items: center; gap: 8px; color: var(--green); }
+.aside-heading-icon h2 { margin-bottom: 0; }
+.transition-actions { display: grid; gap: 7px; margin-top: 15px; }
+.transition-button { min-height: 34px; padding: 0 10px; color: #34594a; text-align: left; background: #fff; border: 1px solid #d5e2d9; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 10px; }
+.transition-button::after { content: '→'; float: right; color: #77a18b; }
+.transition-button:hover:not(:disabled) { border-color: #8bb59e; background: #f3faf5; }
+.terminal-note, .service-note { color: #7c8f85; font-size: 10px; line-height: 1.55; }
+.terminal-note { margin: 14px 0 6px; }
+.service-note { margin: 14px 0 0; }
+.page-loading { min-height: 260px; display: flex; align-items: center; justify-content: center; gap: 12px; color: #71857b; font-size: 13px; }
+.state-page { min-height: 370px; }
+.state-card { max-width: 470px; margin: 65px auto; padding: 30px; background: white; border: 1px solid #dce6e0; border-radius: 7px; box-shadow: var(--shadow); }
+.state-card h1 { font-size: 23px; }
+.state-card p { color: #71857b; font-size: 12px; line-height: 1.6; }
+.state-actions { display: flex; gap: 8px; margin-top: 18px; }
+.app-footer { display: flex; align-items: center; gap: 10px; min-height: 47px; padding: 0 5.2vw; color: #8a9a92; background: rgba(255,255,255,0.72); border-top: 1px solid #dfe8e2; font-family: 'DM Mono', monospace; font-size: 9px; }
+.footer-separator { width: 3px; height: 3px; border-radius: 50%; background: #9ab4a5; }
+.app-footer button { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 5px 0 5px 8px; color: var(--green); background: transparent; border: 0; font-size: 10px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 900px) {
+  .topbar { gap: 20px; padding: 0 24px; }
+  .brand { min-width: auto; }
+  .workspace-label { display: none; }
+  .main-shell { width: calc(100% - 48px); padding-top: 36px; }
+  .ticket-table { grid-template-columns: minmax(180px, 2fr) 80px 112px minmax(100px, 1fr) 28px; gap: 10px; padding: 0 14px; }
+  .ticket-table > :nth-child(5) { display: none; }
+  .detail-grid { grid-template-columns: minmax(0, 1fr) 230px; gap: 26px; }
+  .detail-aside { padding-left: 17px; }
+  .app-footer { padding: 0 24px; }
+}
+
+@media (max-width: 640px) {
+  .topbar { height: 60px; gap: 15px; padding: 0 16px; }
+  .brand-mark { width: 31px; height: 31px; }
+  .brand-name { font-size: 15px; }
+  .nav-link { padding: 0 7px; font-size: 11px; }
+  .nav-link.active::after { left: 7px; right: 7px; }
+  .topbar-right { gap: 0; }
+  .main-shell { width: calc(100% - 32px); padding: 28px 0 47px; }
+  .page-heading-row { align-items: flex-start; margin-bottom: 22px; }
+  .page-heading-row > .button { flex: 0 0 auto; min-height: 36px; padding: 0 10px; font-size: 11px; }
+  h1 { font-size: 27px; }
+  .page-subtitle { max-width: 270px; font-size: 12px; line-height: 1.55; }
+  .filter-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 9px; }
+  .search-field { grid-column: 1 / -1; }
+  .filter-status select { width: 100%; min-width: 0; }
+  .filter-bar .button-dark { min-width: 105px; }
+  .result-count { grid-column: 1 / -1; justify-self: end; min-height: 15px; }
+  .clear-filter { position: absolute; margin-top: 48px; margin-left: 112px; }
+  .ticket-table-header { display: none; }
+  .ticket-table { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 13px 13px; }
+  .ticket-row { min-height: 83px; }
+  .ticket-name-cell { grid-column: 1; }
+  .ticket-row > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .ticket-row > :nth-child(3) { grid-column: 1; grid-row: 2; }
+  .ticket-row > :nth-child(4) { grid-column: 2; grid-row: 2; justify-self: end; max-width: 140px; }
+  .ticket-row > :nth-child(5) { display: none; }
+  .ticket-row > :nth-child(6) { display: none; }
+  .ticket-name-cell strong { max-width: 225px; font-size: 12px; }
+  .form-sheet { padding: 18px 15px; }
+  .form-grid { grid-template-columns: 1fr; gap: 17px; }
+  .field-wide { grid-column: auto; }
+  .detail-topline { margin-bottom: 18px; }
+  .detail-id { max-width: 56%; overflow: hidden; }
+  .detail-id code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail-heading { align-items: flex-start; flex-direction: column; gap: 14px; padding-bottom: 19px; margin-bottom: 21px; }
+  .detail-heading h1 { font-size: 25px; }
+  .detail-grid { grid-template-columns: 1fr; gap: 4px; }
+  .detail-aside { order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 0 8px; border-left: 0; }
+  .aside-section { min-width: 0; padding: 13px; border: 1px solid #dce6e0; border-radius: 6px; background: rgba(255,255,255,.55); }
+  .ticket-facts { gap: 10px; }
+  .ticket-facts dd { font-size: 10px; }
+  .transition-actions { margin-top: 11px; }
+  .transition-button { min-height: 31px; padding: 0 7px; font-size: 9px; }
+  .service-note { font-size: 9px; }
+  .comment-form { padding: 15px 12px; }
+  .comment-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .app-footer { padding: 0 16px; font-size: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/styles.css`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/styles.css
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **styles.css**</summary>
+
+@@ lines 1-1 @@
+
+```
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  color: #18342d;
+  background: #f3f6f3;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #18342d;
+  --muted: #6d8079;
+  --line: #dce6e0;
+  --paper: #ffffff;
+  --mint: #e2f1e9;
+  --green: #167258;
+  --green-dark: #104f3d;
+  --lime: #c9e76f;
+  --coral: #d95f48;
+  --yellow: #f0d976;
+  --blue: #467c96;
+  --shadow: 0 14px 34px rgba(28, 67, 54, 0.07);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 340px;
+  min-height: 100vh;
+  background-color: #f3f6f3;
+  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 39px, rgba(34, 81, 65, 0.025) 40px);
+}
+
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.65; }
+a { color: inherit; text-decoration: none; }
+
+:focus-visible {
+  outline: 3px solid rgba(22, 114, 88, 0.28);
+  outline-offset: 2px;
+}
+
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+  height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding: 0 5.2vw;
+  background: rgba(255, 255, 255, 0.93);
+  border-bottom: 1px solid #dfe8e2;
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; min-width: 188px; }
+.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: #f8fff9; background: var(--green); border-radius: 8px; }
+.brand-name { font-size: 17px; line-height: 1; font-weight: 700; letter-spacing: 0; }
+.brand-name span { color: var(--green); }
+.top-nav { display: flex; align-self: stretch; align-items: stretch; }
+.nav-link { position: relative; display: inline-flex; align-items: center; gap: 9px; color: #75867f; font-size: 13px; font-weight: 600; padding: 0 14px; }
+.nav-link.active { color: var(--green-dark); }
+.nav-link.active::after { content: ''; position: absolute; bottom: -1px; left: 14px; right: 14px; height: 3px; border-radius: 4px 4px 0 0; background: var(--green); }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 19px; }
+.workspace-label { display: flex; align-items: center; gap: 8px; color: #536a61; font-size: 12px; font-weight: 600; }
+.workspace-dot, .live-indicator { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #61a876; box-shadow: 0 0 0 3px #e2f3e6; }
+.icon-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: #5d766c; }
+
+.main-shell { width: min(1250px, calc(100% - 10.4vw)); margin: 0 auto; flex: 1; padding: 48px 0 76px; }
+.page-section { width: 100%; }
+.page-heading-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 29px; }
+.eyebrow { margin: 0 0 9px; color: #799087; font-family: 'DM Mono', monospace; font-size: 10px; line-height: 1.3; font-weight: 500; letter-spacing: 0.08em; }
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 8px; color: #18342d; font-size: 32px; line-height: 1.13; font-weight: 600; letter-spacing: 0; }
+.page-subtitle { margin: 0; color: #70827b; font-size: 14px; }
+h2 { margin-bottom: 15px; color: #244137; font-size: 16px; line-height: 1.3; font-weight: 700; letter-spacing: 0; }
+
+.button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 6px; font-size: 12px; line-height: 1; font-weight: 700; transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease; }
+.button:not(:disabled):active { transform: translateY(1px); }
+.button-primary { color: #17392e; background: var(--lime); border-color: #bddc62; }
+.button-primary:hover:not(:disabled) { background: #bfe05c; }
+.button-dark { color: white; background: var(--green-dark); }
+.button-dark:hover:not(:disabled) { background: #0b4232; }
+.button-secondary { color: var(--green-dark); background: #fff; border-color: #c8d8d0; }
+.button-secondary:hover:not(:disabled) { border-color: var(--green); background: #f4faf6; }
+.button-quiet { color: #526b61; background: transparent; border-color: transparent; }
+.button-quiet:hover:not(:disabled) { color: var(--green-dark); background: #eaf2ed; }
+.button-small { min-height: 31px; padding: 0 10px; font-size: 11px; }
+
+.filter-bar { min-height: 56px; display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin-bottom: 16px; background: #e8efea; border: 1px solid #dce7df; border-radius: 7px; }
+.search-field { flex: 1 1 340px; min-width: 180px; height: 38px; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: white; border: 1px solid #dce6e0; border-radius: 5px; color: #7b8e85; }
+.search-field input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12px; }
+.search-field input::placeholder { color: #94a49d; }
+.filter-status select { min-width: 148px; height: 38px; padding: 0 28px 0 11px; border: 1px solid #dce6e0; border-radius: 5px; color: #39584b; background: white; font-size: 12px; }
+.result-count { min-width: 85px; margin-left: auto; color: #71847b; text-align: right; font-family: 'DM Mono', monospace; font-size: 10px; }
+.clear-filter { min-height: 34px; padding: 0 7px; }
+.ticket-table-wrap { overflow: hidden; background: white; border: 1px solid #dbe5df; border-radius: 7px; box-shadow: var(--shadow); }
+.ticket-table { display: grid; grid-template-columns: minmax(230px, 2.2fr) minmax(85px, 0.8fr) minmax(118px, 1fr) minmax(130px, 1.1fr) minmax(110px, 0.9fr) 28px; gap: 16px; align-items: center; padding: 0 20px; }
+.ticket-table-header { min-height: 42px; color: #85968e; background: #f8faf8; border-bottom: 1px solid #e6ede8; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+.ticket-row { min-height: 76px; border-bottom: 1px solid #edf1ee; transition: background-color 120ms ease; }
+.ticket-row:last-child { border-bottom: 0; }
+.ticket-row:hover { background: #f7fbf8; }
+.ticket-name-cell { min-width: 0; display: grid; gap: 6px; }
+.ticket-name-cell strong { overflow: hidden; color: #234338; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.ticket-name-cell code, .detail-id code { color: #8b9b94; font-family: 'DM Mono', monospace; font-size: 9px; }
+.priority-tag, .status-tag { width: fit-content; display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; }
+.priority-low { color: #456f5c; background: #e6f2e8; }
+.priority-medium { color: #85641a; background: #f8f0d4; }
+.priority-high { color: #a24d35; background: #f9e5da; }
+.priority-critical { color: #a32e3a; background: #f8dfe2; }
+.status-open { color: #246c4c; background: #e3f3e7; }
+.status-in_progress { color: #3d6d83; background: #e4f0f5; }
+.status-resolved { color: #6c5a9e; background: #eee9f7; }
+.status-closed { color: #67756f; background: #e9eeeb; }
+.status-cancelled { color: #a24d35; background: #f9e7dd; }
+.assignee-cell, .date-cell { overflow: hidden; color: #526d61; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.muted { color: #98a7a0; }
+.date-cell { font-family: 'DM Mono', monospace; font-size: 10px; }
+.row-arrow { display: grid; place-items: center; color: #83a194; }
+.table-state { min-height: 190px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #71857b; font-size: 13px; }
+.empty-state { flex-direction: column; gap: 9px; padding: 24px; text-align: center; }
+.empty-state strong { color: #29483b; font-size: 15px; }
+.empty-state > span:not(.empty-mark) { margin-bottom: 8px; font-size: 12px; }
+.empty-mark { width: 40px; height: 40px; display: grid; place-items: center; margin-bottom: 2px; border-radius: 8px; color: var(--green); background: var(--mint); }
+.loading-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px #dceddf; animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(22, 114, 88, 0.06); opacity: 0.55; } }
+.table-footnote { display: flex; align-items: center; gap: 9px; margin-top: 13px; color: #8b9a93; font-size: 10px; }
+.live-indicator { width: 6px; height: 6px; box-shadow: none; }
+
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 13px; margin: 0 0 15px; border: 1px solid; border-radius: 6px; font-size: 12px; }
+.notice-error { color: #953f37; background: #fff1ed; border-color: #f1c9bf; }
+
+.form-sheet { max-width: 790px; padding: 28px; background: #fff; border: 1px solid #dce6e0; border-radius: 7px; box-shadow: var(--shadow); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 21px 18px; }
+.field { min-width: 0; display: flex; flex-direction: column; gap: 8px; color: #36574a; font-size: 12px; font-weight: 700; }
+.field-wide { grid-column: 1 / -1; }
+.field input, .field textarea, .field select { width: 100%; min-height: 39px; padding: 9px 11px; color: #18342d; background: #fcfdfc; border: 1px solid #cfddd5; border-radius: 5px; font-size: 12px; font-weight: 400; resize: vertical; }
+.field input::placeholder, .field textarea::placeholder { color: #9aa9a2; }
+.field textarea { min-height: 112px; line-height: 1.55; }
+.required-mark, .optional-mark { margin-left: 5px; color: #a05d40; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400; }
+.optional-mark { color: #91a098; }
+.field-error { color: #a5443b; font-size: 10px; font-weight: 500; }
+.field-hint { align-self: flex-end; color: #91a098; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400; }
+.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 24px; padding-top: 17px; border-top: 1px solid #e8eee9; }
+.form-actions-end { justify-content: flex-end; margin-top: 10px; padding-top: 0; border: 0; }
+
+.detail-page { max-width: 1060px; margin: 0 auto; }
+.detail-topline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+.back-link { padding-left: 0; }
+.detail-id { display: inline-flex; align-items: center; gap: 9px; color: #90a098; font-family: 'DM Mono', monospace; font-size: 9px; }
+.detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 23px; margin-bottom: 26px; border-bottom: 1px solid #dbe5df; }
+.detail-tags { display: flex; gap: 7px; margin-bottom: 13px; }
+.detail-heading h1 { max-width: 740px; margin-bottom: 0; font-size: 30px; }
+.detail-heading .button { flex: 0 0 auto; }
+.detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 270px; align-items: start; gap: 43px; }
+.detail-main { min-width: 0; }
+.content-section { padding-bottom: 28px; margin-bottom: 26px; border-bottom: 1px solid #dbe5df; }
+.content-section h2 { display: flex; align-items: center; gap: 9px; }
+.description-text { max-width: 760px; margin-bottom: 0; color: #526d61; font-size: 13px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.section-heading-row { display: flex; align-items: flex-end; justify-content: space-between; }
+.section-heading-row .eyebrow { margin-bottom: 5px; }
+.section-heading-row h2 { margin-bottom: 0; }
+.section-count { display: inline-grid; min-width: 21px; height: 21px; place-items: center; margin-left: 3px; color: #688176; background: #e7efea; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 9px; }
+.comment-list { display: grid; margin-top: 15px; }
+.comment-item { display: grid; grid-template-columns: 31px minmax(0, 1fr); gap: 11px; padding: 16px 0; border-bottom: 1px solid #e3ebe5; }
+.comment-marker { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 7px; color: #1c644c; background: #dff0e5; font-size: 12px; font-weight: 700; }
+.comment-item:nth-child(3n + 2) .comment-marker { color: #935037; background: #f7e7dc; }
+.comment-item:nth-child(3n) .comment-marker { color: #416d84; background: #e1eef2; }
+.comment-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.comment-meta strong { color: #29483c; font-size: 11px; }
+.comment-meta time { color: #93a199; font-family: 'DM Mono', monospace; font-size: 9px; white-space: nowrap; }
+.comment-body p { margin: 6px 0 0; color: #536b60; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comments-empty { padding: 20px 0; color: #83948b; font-size: 12px; }
+.comment-form { display: grid; gap: 15px; padding: 20px; margin-top: 17px; background: rgba(255, 255, 255, 0.7); border: 1px solid #dce6e0; border-radius: 7px; }
+.comment-form .field textarea { min-height: 76px; }
+.detail-aside { border-left: 1px solid #dce6e0; padding-left: 23px; }
+.aside-section { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #dce6e0; }
+.aside-section h2 { margin-bottom: 13px; font-size: 13px; }
+.ticket-facts { display: grid; gap: 15px; margin: 0; }
+.ticket-facts div { display: grid; gap: 6px; }
+.ticket-facts dt { color: #8b9a93; font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; }
+.ticket-facts dd { display: flex; align-items: center; gap: 6px; margin: 0; color: #3d5a4e; font-size: 11px; overflow-wrap: anywhere; }
+.aside-heading-icon { display: flex; align-items: center; gap: 8px; color: var(--green); }
+.aside-heading-icon h2 { margin-bottom: 0; }
+.transition-actions { display: grid; gap: 7px; margin-top: 15px; }
+.transition-button { min-height: 34px; padding: 0 10px; color: #34594a; text-align: left; background: #fff; border: 1px solid #d5e2d9; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 10px; }
+.transition-button::after { content: '→'; float: right; color: #77a18b; }
+.transition-button:hover:not(:disabled) { border-color: #8bb59e; background: #f3faf5; }
+.terminal-note, .service-note { color: #7c8f85; font-size: 10px; line-height: 1.55; }
+.terminal-note { margin: 14px 0 6px; }
+.service-note { margin: 14px 0 0; }
+.page-loading { min-height: 260px; display: flex; align-items: center; justify-content: center; gap: 12px; color: #71857b; font-size: 13px; }
+.state-page { min-height: 370px; }
+.state-card { max-width: 470px; margin: 65px auto; padding: 30px; background: white; border: 1px solid #dce6e0; border-radius: 7px; box-shadow: var(--shadow); }
+.state-card h1 { font-size: 23px; }
+.state-card p { color: #71857b; font-size: 12px; line-height: 1.6; }
+.state-actions { display: flex; gap: 8px; margin-top: 18px; }
+.app-footer { display: flex; align-items: center; gap: 10px; min-height: 47px; padding: 0 5.2vw; color: #8a9a92; background: rgba(255,255,255,0.72); border-top: 1px solid #dfe8e2; font-family: 'DM Mono', monospace; font-size: 9px; }
+.footer-separator { width: 3px; height: 3px; border-radius: 50%; background: #9ab4a5; }
+.app-footer button { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 5px 0 5px 8px; color: var(--green); background: transparent; border: 0; font-size: 10px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 900px) {
+  .topbar { gap: 20px; padding: 0 24px; }
+  .brand { min-width: auto; }
+  .workspace-label { display: none; }
+  .main-shell { width: calc(100% - 48px); padding-top: 36px; }
+  .ticket-table { grid-template-columns: minmax(180px, 2fr) 80px 112px minmax(100px, 1fr) 28px; gap: 10px; padding: 0 14px; }
+  .ticket-table > :nth-child(5) { display: none; }
+  .detail-grid { grid-template-columns: minmax(0, 1fr) 230px; gap: 26px; }
+  .detail-aside { padding-left: 17px; }
+  .app-footer { padding: 0 24px; }
+}
+
+@media (max-width: 640px) {
+  .topbar { height: 60px; gap: 15px; padding: 0 16px; }
+  .brand-mark { width: 31px; height: 31px; }
+  .brand-name { font-size: 15px; }
+  .nav-link { padding: 0 7px; font-size: 11px; }
+  .nav-link.active::after { left: 7px; right: 7px; }
+  .topbar-right { gap: 0; }
+  .main-shell { width: calc(100% - 32px); padding: 28px 0 47px; }
+  .page-heading-row { align-items: flex-start; margin-bottom: 22px; }
+  .page-heading-row > .button { flex: 0 0 auto; min-height: 36px; padding: 0 10px; font-size: 11px; }
+  h1 { font-size: 27px; }
+  .page-subtitle { max-width: 270px; font-size: 12px; line-height: 1.55; }
+  .filter-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 9px; }
+  .search-field { grid-column: 1 / -1; }
+  .filter-status select { width: 100%; min-width: 0; }
+  .filter-bar .button-dark { min-width: 105px; }
+  .result-count { grid-column: 1 / -1; justify-self: end; min-height: 15px; }
+  .clear-filter { position: absolute; margin-top: 48px; margin-left: 112px; }
+  .ticket-table-header { display: none; }
+  .ticket-table { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 13px 13px; }
+  .ticket-row { min-height: 83px; }
+  .ticket-name-cell { grid-column: 1; }
+  .ticket-row > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .ticket-row > :nth-child(3) { grid-column: 1; grid-row: 2; }
+  .ticket-row > :nth-child(4) { grid-column: 2; grid-row: 2; justify-self: end; max-width: 140px; }
+  .ticket-row > :nth-child(5) { display: none; }
+  .ticket-row > :nth-child(6) { display: none; }
+  .ticket-name-cell strong { max-width: 225px; font-size: 12px; }
+  .form-sheet { padding: 18px 15px; }
+  .form-grid { grid-template-columns: 1fr; gap: 17px; }
+  .field-wide { grid-column: auto; }
+  .detail-topline { margin-bottom: 18px; }
+  .detail-id { max-width: 56%; overflow: hidden; }
+  .detail-id code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail-heading { align-items: flex-start; flex-direction: column; gap: 14px; padding-bottom: 19px; margin-bottom: 21px; }
+  .detail-heading h1 { font-size: 25px; }
+  .detail-grid { grid-template-columns: 1fr; gap: 4px; }
+  .detail-aside { order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 0 8px; border-left: 0; }
+  .aside-section { min-width: 0; padding: 13px; border: 1px solid #dce6e0; border-radius: 6px; background: rgba(255,255,255,.55); }
+  .ticket-facts { gap: 10px; }
+  .ticket-facts dd { font-size: 10px; }
+  .transition-actions { margin-top: 11px; }
+  .transition-button { min-height: 31px; padding: 0 7px; font-size: 9px; }
+  .service-note { font-size: 9px; }
+  .comment-form { padding: 15px 12px; }
+  .comment-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .app-footer { padding: 0 16px; font-size: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **index.html**</summary>
+
+@@ lines 1-18 @@
+
+```
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f7f5" />
+    <meta name="description" content="Support ticket management workspace" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <title>Support Desk</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **styles.css**</summary>
+
+@@ lines 1-1 @@
+
+```
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  color: #18342d;
+  background: #f3f6f3;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #18342d;
+  --muted: #6d8079;
+  --line: #dce6e0;
+  --paper: #ffffff;
+  --mint: #e2f1e9;
+  --green: #167258;
+  --green-dark: #104f3d;
+  --lime: #c9e76f;
+  --coral: #d95f48;
+  --yellow: #f0d976;
+  --blue: #467c96;
+  --shadow: 0 14px 34px rgba(28, 67, 54, 0.07);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 340px;
+  min-height: 100vh;
+  background-color: #f3f6f3;
+  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 39px, rgba(34, 81, 65, 0.025) 40px);
+}
+
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.65; }
+a { color: inherit; text-decoration: none; }
+
+:focus-visible {
+  outline: 3px solid rgba(22, 114, 88, 0.28);
+  outline-offset: 2px;
+}
+
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+  height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding: 0 5.2vw;
+  background: rgba(255, 255, 255, 0.93);
+  border-bottom: 1px solid #dfe8e2;
+}
+.brand { display: inline-flex; align-items: center; gap: 10px; min-width: 188px; }
+.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: #f8fff9; background: var(--green); border-radius: 8px; }
+.brand-name { font-size: 17px; line-height: 1; font-weight: 700; letter-spacing: 0; }
+.brand-name span { color: var(--green); }
+.top-nav { display: flex; align-self: stretch; align-items: stretch; }
+.nav-link { position: relative; display: inline-flex; align-items: center; gap: 9px; color: #75867f; font-size: 13px; font-weight: 600; padding: 0 14px; }
+.nav-link.active { color: var(--green-dark); }
+.nav-link.active::after { content: ''; position: absolute; bottom: -1px; left: 14px; right: 14px; height: 3px; border-radius: 4px 4px 0 0; background: var(--green); }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 19px; }
+.workspace-label { display: flex; align-items: center; gap: 8px; color: #536a61; font-size: 12px; font-weight: 600; }
+.workspace-dot, .live-indicator { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #61a876; box-shadow: 0 0 0 3px #e2f3e6; }
+.icon-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: #5d766c; }
+
+.main-shell { width: min(1250px, calc(100% - 10.4vw)); margin: 0 auto; flex: 1; padding: 48px 0 76px; }
+.page-section { width: 100%; }
+.page-heading-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 29px; }
+.eyebrow { margin: 0 0 9px; color: #799087; font-family: 'DM Mono', monospace; font-size: 10px; line-height: 1.3; font-weight: 500; letter-spacing: 0.08em; }
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 8px; color: #18342d; font-size: 32px; line-height: 1.13; font-weight: 600; letter-spacing: 0; }
+.page-subtitle { margin: 0; color: #70827b; font-size: 14px; }
+h2 { margin-bottom: 15px; color: #244137; font-size: 16px; line-height: 1.3; font-weight: 700; letter-spacing: 0; }
+
+.button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 1px solid transparent; border-radius: 6px; font-size: 12px; line-height: 1; font-weight: 700; transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease; }
+.button:not(:disabled):active { transform: translateY(1px); }
+.button-primary { color: #17392e; background: var(--lime); border-color: #bddc62; }
+.button-primary:hover:not(:disabled) { background: #bfe05c; }
+.button-dark { color: white; background: var(--green-dark); }
+.button-dark:hover:not(:disabled) { background: #0b4232; }
+.button-secondary { color: var(--green-dark); background: #fff; border-color: #c8d8d0; }
+.button-secondary:hover:not(:disabled) { border-color: var(--green); background: #f4faf6; }
+.button-quiet { color: #526b61; background: transparent; border-color: transparent; }
+.button-quiet:hover:not(:disabled) { color: var(--green-dark); background: #eaf2ed; }
+.button-small { min-height: 31px; padding: 0 10px; font-size: 11px; }
+
+.filter-bar { min-height: 56px; display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin-bottom: 16px; background: #e8efea; border: 1px solid #dce7df; border-radius: 7px; }
+.search-field { flex: 1 1 340px; min-width: 180px; height: 38px; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: white; border: 1px solid #dce6e0; border-radius: 5px; color: #7b8e85; }
+.search-field input { width: 100%; min-width: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 12px; }
+.search-field input::placeholder { color: #94a49d; }
+.filter-status select { min-width: 148px; height: 38px; padding: 0 28px 0 11px; border: 1px solid #dce6e0; border-radius: 5px; color: #39584b; background: white; font-size: 12px; }
+.result-count { min-width: 85px; margin-left: auto; color: #71847b; text-align: right; font-family: 'DM Mono', monospace; font-size: 10px; }
+.clear-filter { min-height: 34px; padding: 0 7px; }
+.ticket-table-wrap { overflow: hidden; background: white; border: 1px solid #dbe5df; border-radius: 7px; box-shadow: var(--shadow); }
+.ticket-table { display: grid; grid-template-columns: minmax(230px, 2.2fr) minmax(85px, 0.8fr) minmax(118px, 1fr) minmax(130px, 1.1fr) minmax(110px, 0.9fr) 28px; gap: 16px; align-items: center; padding: 0 20px; }
+.ticket-table-header { min-height: 42px; color: #85968e; background: #f8faf8; border-bottom: 1px solid #e6ede8; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+.ticket-row { min-height: 76px; border-bottom: 1px solid #edf1ee; transition: background-color 120ms ease; }
+.ticket-row:last-child { border-bottom: 0; }
+.ticket-row:hover { background: #f7fbf8; }
+.ticket-name-cell { min-width: 0; display: grid; gap: 6px; }
+.ticket-name-cell strong { overflow: hidden; color: #234338; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.ticket-name-cell code, .detail-id code { color: #8b9b94; font-family: 'DM Mono', monospace; font-size: 9px; }
+.priority-tag, .status-tag { width: fit-content; display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; }
+.priority-low { color: #456f5c; background: #e6f2e8; }
+.priority-medium { color: #85641a; background: #f8f0d4; }
+.priority-high { color: #a24d35; background: #f9e5da; }
+.priority-critical { color: #a32e3a; background: #f8dfe2; }
+.status-open { color: #246c4c; background: #e3f3e7; }
+.status-in_progress { color: #3d6d83; background: #e4f0f5; }
+.status-resolved { color: #6c5a9e; background: #eee9f7; }
+.status-closed { color: #67756f; background: #e9eeeb; }
+.status-cancelled { color: #a24d35; background: #f9e7dd; }
+.assignee-cell, .date-cell { overflow: hidden; color: #526d61; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.muted { color: #98a7a0; }
+.date-cell { font-family: 'DM Mono', monospace; font-size: 10px; }
+.row-arrow { display: grid; place-items: center; color: #83a194; }
+.table-state { min-height: 190px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #71857b; font-size: 13px; }
+.empty-state { flex-direction: column; gap: 9px; padding: 24px; text-align: center; }
+.empty-state strong { color: #29483b; font-size: 15px; }
+.empty-state > span:not(.empty-mark) { margin-bottom: 8px; font-size: 12px; }
+.empty-mark { width: 40px; height: 40px; display: grid; place-items: center; margin-bottom: 2px; border-radius: 8px; color: var(--green); background: var(--mint); }
+.loading-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px #dceddf; animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(22, 114, 88, 0.06); opacity: 0.55; } }
+.table-footnote { display: flex; align-items: center; gap: 9px; margin-top: 13px; color: #8b9a93; font-size: 10px; }
+.live-indicator { width: 6px; height: 6px; box-shadow: none; }
+
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 13px; margin: 0 0 15px; border: 1px solid; border-radius: 6px; font-size: 12px; }
+.notice-error { color: #953f37; background: #fff1ed; border-color: #f1c9bf; }
+
+.form-sheet { max-width: 790px; padding: 28px; background: #fff; border: 1px solid #dce6e0; border-radius: 7px; box-shadow: var(--shadow); }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 21px 18px; }
+.field { min-width: 0; display: flex; flex-direction: column; gap: 8px; color: #36574a; font-size: 12px; font-weight: 700; }
+.field-wide { grid-column: 1 / -1; }
+.field input, .field textarea, .field select { width: 100%; min-height: 39px; padding: 9px 11px; color: #18342d; background: #fcfdfc; border: 1px solid #cfddd5; border-radius: 5px; font-size: 12px; font-weight: 400; resize: vertical; }
+.field input::placeholder, .field textarea::placeholder { color: #9aa9a2; }
+.field textarea { min-height: 112px; line-height: 1.55; }
+.required-mark, .optional-mark { margin-left: 5px; color: #a05d40; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400; }
+.optional-mark { color: #91a098; }
+.field-error { color: #a5443b; font-size: 10px; font-weight: 500; }
+.field-hint { align-self: flex-end; color: #91a098; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400; }
+.form-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 24px; padding-top: 17px; border-top: 1px solid #e8eee9; }
+.form-actions-end { justify-content: flex-end; margin-top: 10px; padding-top: 0; border: 0; }
+
+.detail-page { max-width: 1060px; margin: 0 auto; }
+.detail-topline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+.back-link { padding-left: 0; }
+.detail-id { display: inline-flex; align-items: center; gap: 9px; color: #90a098; font-family: 'DM Mono', monospace; font-size: 9px; }
+.detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 23px; margin-bottom: 26px; border-bottom: 1px solid #dbe5df; }
+.detail-tags { display: flex; gap: 7px; margin-bottom: 13px; }
+.detail-heading h1 { max-width: 740px; margin-bottom: 0; font-size: 30px; }
+.detail-heading .button { flex: 0 0 auto; }
+.detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 270px; align-items: start; gap: 43px; }
+.detail-main { min-width: 0; }
+.content-section { padding-bottom: 28px; margin-bottom: 26px; border-bottom: 1px solid #dbe5df; }
+.content-section h2 { display: flex; align-items: center; gap: 9px; }
+.description-text { max-width: 760px; margin-bottom: 0; color: #526d61; font-size: 13px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.section-heading-row { display: flex; align-items: flex-end; justify-content: space-between; }
+.section-heading-row .eyebrow { margin-bottom: 5px; }
+.section-heading-row h2 { margin-bottom: 0; }
+.section-count { display: inline-grid; min-width: 21px; height: 21px; place-items: center; margin-left: 3px; color: #688176; background: #e7efea; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 9px; }
+.comment-list { display: grid; margin-top: 15px; }
+.comment-item { display: grid; grid-template-columns: 31px minmax(0, 1fr); gap: 11px; padding: 16px 0; border-bottom: 1px solid #e3ebe5; }
+.comment-marker { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 7px; color: #1c644c; background: #dff0e5; font-size: 12px; font-weight: 700; }
+.comment-item:nth-child(3n + 2) .comment-marker { color: #935037; background: #f7e7dc; }
+.comment-item:nth-child(3n) .comment-marker { color: #416d84; background: #e1eef2; }
+.comment-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.comment-meta strong { color: #29483c; font-size: 11px; }
+.comment-meta time { color: #93a199; font-family: 'DM Mono', monospace; font-size: 9px; white-space: nowrap; }
+.comment-body p { margin: 6px 0 0; color: #536b60; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comments-empty { padding: 20px 0; color: #83948b; font-size: 12px; }
+.comment-form { display: grid; gap: 15px; padding: 20px; margin-top: 17px; background: rgba(255, 255, 255, 0.7); border: 1px solid #dce6e0; border-radius: 7px; }
+.comment-form .field textarea { min-height: 76px; }
+.detail-aside { border-left: 1px solid #dce6e0; padding-left: 23px; }
+.aside-section { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #dce6e0; }
+.aside-section h2 { margin-bottom: 13px; font-size: 13px; }
+.ticket-facts { display: grid; gap: 15px; margin: 0; }
+.ticket-facts div { display: grid; gap: 6px; }
+.ticket-facts dt { color: #8b9a93; font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; }
+.ticket-facts dd { display: flex; align-items: center; gap: 6px; margin: 0; color: #3d5a4e; font-size: 11px; overflow-wrap: anywhere; }
+.aside-heading-icon { display: flex; align-items: center; gap: 8px; color: var(--green); }
+.aside-heading-icon h2 { margin-bottom: 0; }
+.transition-actions { display: grid; gap: 7px; margin-top: 15px; }
+.transition-button { min-height: 34px; padding: 0 10px; color: #34594a; text-align: left; background: #fff; border: 1px solid #d5e2d9; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 10px; }
+.transition-button::after { content: '→'; float: right; color: #77a18b; }
+.transition-button:hover:not(:disabled) { border-color: #8bb59e; background: #f3faf5; }
+.terminal-note, .service-note { color: #7c8f85; font-size: 10px; line-height: 1.55; }
+.terminal-note { margin: 14px 0 6px; }
+.service-note { margin: 14px 0 0; }
+.page-loading { min-height: 260px; display: flex; align-items: center; justify-content: center; gap: 12px; color: #71857b; font-size: 13px; }
+.state-page { min-height: 370px; }
+.state-card { max-width: 470px; margin: 65px auto; padding: 30px; background: white; border: 1px solid #dce6e0; border-radius: 7px; box-shadow: var(--shadow); }
+.state-card h1 { font-size: 23px; }
+.state-card p { color: #71857b; font-size: 12px; line-height: 1.6; }
+.state-actions { display: flex; gap: 8px; margin-top: 18px; }
+.app-footer { display: flex; align-items: center; gap: 10px; min-height: 47px; padding: 0 5.2vw; color: #8a9a92; background: rgba(255,255,255,0.72); border-top: 1px solid #dfe8e2; font-family: 'DM Mono', monospace; font-size: 9px; }
+.footer-separator { width: 3px; height: 3px; border-radius: 50%; background: #9ab4a5; }
+.app-footer button { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 5px 0 5px 8px; color: var(--green); background: transparent; border: 0; font-size: 10px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 900px) {
+  .topbar { gap: 20px; padding: 0 24px; }
+  .brand { min-width: auto; }
+  .workspace-label { display: none; }
+  .main-shell { width: calc(100% - 48px); padding-top: 36px; }
+  .ticket-table { grid-template-columns: minmax(180px, 2fr) 80px 112px minmax(100px, 1fr) 28px; gap: 10px; padding: 0 14px; }
+  .ticket-table > :nth-child(5) { display: none; }
+  .detail-grid { grid-template-columns: minmax(0, 1fr) 230px; gap: 26px; }
+  .detail-aside { padding-left: 17px; }
+  .app-footer { padding: 0 24px; }
+}
+
+@media (max-width: 640px) {
+  .topbar { height: 60px; gap: 15px; padding: 0 16px; }
+  .brand-mark { width: 31px; height: 31px; }
+  .brand-name { font-size: 15px; }
+  .nav-link { padding: 0 7px; font-size: 11px; }
+  .nav-link.active::after { left: 7px; right: 7px; }
+  .topbar-right { gap: 0; }
+  .main-shell { width: calc(100% - 32px); padding: 28px 0 47px; }
+  .page-heading-row { align-items: flex-start; margin-bottom: 22px; }
+  .page-heading-row > .button { flex: 0 0 auto; min-height: 36px; padding: 0 10px; font-size: 11px; }
+  h1 { font-size: 27px; }
+  .page-subtitle { max-width: 270px; font-size: 12px; line-height: 1.55; }
+  .filter-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 9px; }
+  .search-field { grid-column: 1 / -1; }
+  .filter-status select { width: 100%; min-width: 0; }
+  .filter-bar .button-dark { min-width: 105px; }
+  .result-count { grid-column: 1 / -1; justify-self: end; min-height: 15px; }
+  .clear-filter { position: absolute; margin-top: 48px; margin-left: 112px; }
+  .ticket-table-header { display: none; }
+  .ticket-table { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 13px 13px; }
+  .ticket-row { min-height: 83px; }
+  .ticket-name-cell { grid-column: 1; }
+  .ticket-row > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .ticket-row > :nth-child(3) { grid-column: 1; grid-row: 2; }
+  .ticket-row > :nth-child(4) { grid-column: 2; grid-row: 2; justify-self: end; max-width: 140px; }
+  .ticket-row > :nth-child(5) { display: none; }
+  .ticket-row > :nth-child(6) { display: none; }
+  .ticket-name-cell strong { max-width: 225px; font-size: 12px; }
+  .form-sheet { padding: 18px 15px; }
+  .form-grid { grid-template-columns: 1fr; gap: 17px; }
+  .field-wide { grid-column: auto; }
+  .detail-topline { margin-bottom: 18px; }
+  .detail-id { max-width: 56%; overflow: hidden; }
+  .detail-id code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail-heading { align-items: flex-start; flex-direction: column; gap: 14px; padding-bottom: 19px; margin-bottom: 21px; }
+  .detail-heading h1 { font-size: 25px; }
+  .detail-grid { grid-template-columns: 1fr; gap: 4px; }
+  .detail-aside { order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 0 8px; border-left: 0; }
+  .aside-section { min-width: 0; padding: 13px; border: 1px solid #dce6e0; border-radius: 6px; background: rgba(255,255,255,.55); }
+  .ticket-facts { gap: 10px; }
+  .ticket-facts dd { font-size: 10px; }
+  .transition-actions { margin-top: 11px; }
+  .transition-button { min-height: 31px; padding: 0 7px; font-size: 9px; }
+  .service-note { font-size: 9px; }
+  .comment-form { padding: 15px 12px; }
+  .comment-meta { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .app-footer { padding: 0 16px; font-size: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **index.html**</summary>
+
+@@ lines 1-18 @@
+
+```
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f7f5" />
+    <meta name="description" content="Support ticket management workspace" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <title>Support Desk</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The UI now covers list/search/filter, create/edit, details/comments, and backend-driven status changes with reload on 409. I’ve also added responsive styling and reduced-motion support; I’m running the production Vite build now to catch actual JSX/CSS integration problems before starting the dev server.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` cd frontend && npm run build`
+
+Run the production Vite build for the new React frontend.
+
+```bash
+cd frontend && npm run build
+```
+
+**Result:**
+
+```
+bash: cd: frontend: No such file or directory
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The terminal remained in `frontend` after dependency installation, so the build command’s extra `cd frontend` targeted a nonexistent nested directory. I’m rerunning the same build from the current frontend directory; no source change is needed.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` npm run build`
+
+Build the Vite app from the active frontend working directory.
+
+```bash
+npm run build
+```
+
+**Result:**
+
+```
+
+> support-ticket-frontend@1.0.0 build
+> vite build
+
+vite v6.4.3 building for production...
+✓ 1583 modules transformed.
+dist/index.html                   0.67 kB │ gzip:  0.36 kB
+dist/assets/index-CJbDheKt.css   16.36 kB │ gzip:  4.43 kB
+dist/assets/index-DDTIPXrv.js   249.50 kB │ gzip: 76.30 kB
+✓ built in 3.79s
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The production build passes. I’m checking generated frontend artifacts before starting the app; npm created `node_modules` and `dist`, which need a frontend-local ignore file so only source/config files are left as 
+
+The production build passes. I’m checking generated frontend artifacts before starting the app; npm created `node_modules` and `dist`, which need a frontend-local ignore file so only source/config files are left as changes.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
+
+Read `frontend`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend`
+
+**Result:**
+
+```
+.env.example
+dist/
+index.html
+node_modules/
+package-lock.json
+package.json
+src/
+vite.config.js
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The generated files are exactly the expected Vite outputs. I’m adding a narrow `frontend/.gitignore` for installed packages, builds, and local env files while keeping `.env.example` tracked.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="create_file"><details>
+<summary>Tool use: **create_file**</summary>
+
+Created `.gitignore`
+
+**Input:**
+
+- content:
+
+```
+node_modules/
+dist/
+.env
+.env.local
+
+```
+
+- filePath: `/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/.gitignore`
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/.gitignore
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **.gitignore**</summary>
+
+@@ lines 1-1 @@
+
+```
+node_modules/
+dist/
+.env
+.env.local
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+I’m starting Vite now so the user can try the frontend at a local URL. The API client defaults to `/api` and the dev proxy points at the backend on port 8080 unless configured otherwise.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` npm run dev -- --port 5173`
+
+Start the new Vite frontend development server for local use.
+
+```bash
+npm run dev -- --port 5173
+```
+
+**Result:**
+
+```
+Command is running in terminal with ID=17389bf5-d521-4e47-8a2c-b42740dd1aaf
+ The command became idle with output:
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  npm run dev -- --port 5173
+npm error code ENOENT
+npm error syscall open
+npm error path /home/sandeep/Desktop/c2_project/c2JiraTicket/package.json
+npm error errno -2
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/sandeep/Desktop/c2_project/c2JiraTicket/package.json'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /home/sandeep/.npm/_logs/2026-09-27T13_20_45_636Z-debug-0.log
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+This note is not a signal to end the turn — pick one of the actions below and continue.
+  1. If the command may still be producing output or the shell prompt has not returned, call get_terminal_output with id="17389bf5-d521-4e47-8a2c-b42740dd1aaf" to continue polling. This is the default and safest action when unsure.
+  2. Only if the output clearly ends with a real non-secret input prompt (Continue? (y/n), Enter selection, etc. — a normal shell prompt like `$` or `#` does NOT count), call the vscode_askQuestions tool to ask the user, then send each answer using send_to_terminal with id="17389bf5-d521-4e47-8a2c-b42740dd1aaf" (which returns the next few lines of output). Repeat one prompt at a time. NEVER route secret prompts (passwords, passphrases, tokens, API keys, etc.) through vscode_askQuestions — answers to that tool are sent through the model. For secret prompts, tell the user to type the value directly into the terminal and stop.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Vite didn’t start because this terminal session was at the repository root, unlike the build terminal. I’m explicitly entering `frontend` in the launch command; the app build itself remains successful.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` cd frontend && npm run dev -- --port 5173`
+
+Start the Vite development server from the frontend subproject directory.
+
+```bash
+cd frontend && npm run dev -- --port 5173
+```
+
+**Result:**
+
+```
+Command is running in terminal with ID=a36f7545-4ff1-441b-bb1b-cd72d62b9195
+ The command became idle with output:
+sandeep@TTNPL-4116:~/Desktop/c2_project/c2JiraTicket(main)$  cd frontend && npm run dev -- --port 5173
+
+> support-ticket-frontend@1.0.0 dev
+> vite --host 0.0.0.0 --port 5173
+
+
+  VITE v6.4.3  ready in 455 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.1.9:5173/
+  ➜  Network: http://10.0.238.185:5173/
+  ➜  press h + enter to show help
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+This note is not a signal to end the turn — pick one of the actions below and continue.
+  1. If the command may still be producing output or the shell prompt has not returned, call get_terminal_output with id="a36f7545-4ff1-441b-bb1b-cd72d62b9195" to continue polling. This is the default and safest action when unsure.
+  2. Only if the output clearly ends with a real non-secret input prompt (Continue? (y/n), Enter selection, etc. — a normal shell prompt like `$` or `#` does NOT count), call the vscode_askQuestions tool to ask the user, then send each answer using send_to_terminal with id="a36f7545-4ff1-441b-bb1b-cd72d62b9195" (which returns the next few lines of output). Repeat one prompt at a time. NEVER route secret prompts (passwords, passphrases, tokens, API keys, etc.) through vscode_askQuestions — answers to that tool are sent through the model. For secret prompts, tell the user to type the value directly into the terminal and stop.
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The frontend dev server is running at `http://localhost:5173/`. I’m checking whether the Spring API is already available on the proxy’s default port 8080 so I can verify the actual end-to-end browser flow rather than only the frontend shell.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` curl -sS -o /dev/null -w '%\{http\_code\}\\n' http://localhost:8080/api/tickets ...`
+
+Check whether a backend is running at the Vite proxy's configured default target.
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:8080/api/tickets || true
+```
+
+**Result:**
+
+```
+curl: (7) Failed to connect to localhost port 8080 after 0 ms: Connection refuse
+d
+000
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="tool_search"><details>
+<summary>Tool use: **tool_search**</summary>
+
+**Input:**
+
+- query: `Use Playwright against the local development server to inspect frontend rendering and console errors at desktop and mobile viewport sizes`
+
+**Result:**
+
+```
+["run_playwright_code","hover_element","read_page","screenshot_page","vscode_fetchWebPage_internal"]
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Port 8080 is not running, so live ticket data won’t load until the backend starts. I can still check the frontend rendering 
+
+Port 8080 is not running, so live ticket data won’t load until the backend starts. I can still check the frontend rendering and responsive layout in a browser; I’m loading the local-browser navigation capability and will verify the page against its API-unavailable state.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="tool_search"><details>
+<summary>Tool use: **tool_search**</summary>
+
+**Input:**
+
+- query: `Open a local development server URL in a browser page and return its browser page ID`
+
+**Result:**
+
+```
+["open_browser_page","navigate_page","read_page","handle_dialog","vscode_fetchWebPage_internal"]
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="open_browser_page"><details>
+<summary>Tool use: **open_browser_page**</summary>
+
+Opened `Browser`
+
+**Input:**
+
+- url: `http://localhost:5173/`
+
+**Result:**
+
+```
+Page ID: 316a5744-d871-49fb-8c77-c4aabfa678a2
+
+Summary:
+
+Page Title: Support Desk
+URL: http://localhost:5173/
+Recent events:
+- [2026-09-27T13:21:46.432Z] (console) [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+- [2026-09-27T13:21:46.436Z] (console) [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+Snapshot: 
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - link "Support Desk tickets" [ref=e5] [cursor=pointer]:
+      - /url: "#/tickets"
+      - img [ref=e7]
+      - generic [ref=e14]: SupportDesk
+    - navigation "Main navigation" [ref=e15]:
+      - link "Tickets" [ref=e16] [cursor=pointer]:
+        - /url: "#/tickets"
+        - img [ref=e17]
+        - text: Tickets
+    - button "Help" [ref=e21] [cursor=pointer]:
+      - img [ref=e22]
+  - main [ref=e25]:
+    - region "Tickets" [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - paragraph [ref=e29]: QUEUE / ALL TICKETS
+          - heading "Tickets" [level=1] [ref=e30]
+          - paragraph [ref=e31]: Track requests and move work forward.
+        - button "New ticket" [ref=e32] [cursor=pointer]:
+          - img [ref=e33]
+          - text: New ticket
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - img [ref=e36]
+          - generic [ref=e39]: Search tickets
+          - textbox "Search tickets" [ref=e40]:
+            - /placeholder: Search title or description
+        - generic [ref=e41]:
+          - generic [ref=e42]: Filter by status
+          - combobox "Filter by status" [ref=e43]:
+            - option "All statuses" [selected]
+            - option "OPEN"
+            - option "IN PROGRESS"
+            - option "RESOLVED"
+            - option "CLOSED"
+            - option "CANCELLED"
+        - button "Apply filters" [ref=e44] [cursor=pointer]
+        - generic [ref=e45]: 0 tickets
+      - alert [ref=e46]:
+        - generic [ref=e47]: Tickets could not be loaded. Please try ag
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_playwright_code"><details>
+<summary>Tool use: **run_playwright_code**</summary>
+
+Ran Playwright code
+
+**Input:**
+
+- code: `await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(400); return await page.evaluate(() => ({ title: document.title, viewport: window.innerWidth, documentWidth: document.documentElement.scrollWidth, hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth, heading: document.querySelector('h1')?.textContent, bodyText: document.body.innerText.slice(0, 420) }));`
+- pageId: `316a5744-d871-49fb-8c77-c4aabfa678a2`
+
+**Result:**
+
+```
+Result: {"title":"Support Desk","viewport":390,"documentWidth":375,"hasHorizontalOverflow":false,"heading":"Create ticket","bodyText":"SupportDesk\nTickets\n\nTICKETS / NEW\n\nCreate ticket\n\nCapture the issue and route it to the right team.\n\nTicket could not be created.\nTitle Required\nDescription Required\n14/2000\nPriority Required\nSelect priority\nLOW\nMEDIUM\nHIGH\nCRITICAL\nAssignee Optional\nCancel\nCreate ticket\nSupport operations\nTicket management"}
+Page Title: Support Desk
+URL: http://localhost:5173/#/tickets/new
+Recent events:
+- [2026-09-27T13:22:08.297Z] (console) [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+Snapshot: 
+- <changed> main [ref=e25]:
+  - generic [ref=e66]:
+    - generic [ref=e68]:
+      - paragraph [ref=e69]: TICKETS / NEW
+      - heading "Create ticket" [level=1] [ref=e70]
+      - paragraph [ref=e71]: Capture the issue and route it to the right team.
+    - generic [ref=e73]:
+      - alert [ref=e74]: Ticket could not be created.
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - generic [ref=e77]: Title Required
+          - textbox "Title Required" [ref=e78]: Sandeep
+        - generic [ref=e79]:
+          - generic [ref=e80]: Description Required
+          - textbox "Description Required 14/2000" [ref=e81]: testing ticket
+          - generic [ref=e82]: 14/2000
+        - generic [ref=e83]:
+          - generic [ref=e84]: Priority Required
+          - combobox "Priority Required" [ref=e85]:
+            - option "Select priority" [disabled]
+            - option "LOW"
+            - option "MEDIUM" [selected]
+            - option "HIGH"
+            - option "CRITICAL"
+        - generic [ref=e86]:
+          - generic [ref=e87]: Assignee Optional
+          - textbox "Assignee Optional" [ref=e88]:
+            - /placeholder: Team or person
+            - text: asshish
+      - generic [ref=e89]:
+        - button "Cancel" [ref=e90] [cursor=pointer]:
+          - img [ref=e91]
+ 
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The mobile viewport check reports no horizontal overflow, but the integrated browser switched to a create-form state with prefilled fields, so I’m resetting the browser to the known ticket-list route and checking for an actual navigation/form-state issue before wrapping up.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="navigate_page"><details>
+<summary>Tool use: **navigate_page**</summary>
+
+Navigated to http://localhost:5173/#/tickets in `Browser`
+
+**Input:**
+
+- pageId: `316a5744-d871-49fb-8c77-c4aabfa678a2`
+- type: `url`
+- url: `http://localhost:5173/#/tickets`
+
+**Result:**
+
+```
+Result: null
+Page Title: Support Desk
+URL: http://localhost:5173/#/tickets
+Recent events:
+- [2026-09-27T13:22:34.582Z] (console) [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+- [2026-09-27T13:22:34.584Z] (console) [error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+Snapshot: 
+- <changed> main [ref=e25]:
+  - region "Tickets" [ref=e98]:
+    - generic [ref=e99]:
+      - generic [ref=e100]:
+        - paragraph [ref=e101]: QUEUE / ALL TICKETS
+        - heading "Tickets" [level=1] [ref=e102]
+        - paragraph [ref=e103]: Track requests and move work forward.
+      - button "New ticket" [ref=e104] [cursor=pointer]:
+        - img [ref=e105]
+        - text: New ticket
+    - generic [ref=e106]:
+      - generic [ref=e107]:
+        - img [ref=e108]
+        - generic [ref=e111]: Search tickets
+        - textbox "Search tickets" [ref=e112]:
+          - /placeholder: Search title or description
+      - generic [ref=e113]:
+        - generic [ref=e114]: Filter by status
+        - combobox "Filter by status" [ref=e115]:
+          - option "All statuses" [selected]
+          - option "OPEN"
+          - option "IN PROGRESS"
+          - option "RESOLVED"
+          - option "CLOSED"
+          - option "CANCELLED"
+      - button "Apply filters" [ref=e116] [cursor=pointer]
+      - generic [ref=e117]: Updating…
+    - status [ref=e119]: Loading tickets…
+    - generic [ref=e121]: Live from the support queue
+- <changed> contentinfo [ref=e60]:
+  - ref=e61 [unchanged]
+  - ref=e63 [unchanged]
+  - button "New ticket" [ref=e123] [cursor=pointer]:
+    - img [ref=e124]
+    - text: New ticket
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="read_page"><details>
+<summary>Tool use: **read_page**</summary>
+
+Read `Browser`
+
+**Input:**
+
+- pageId: `316a5744-d871-49fb-8c77-c4aabfa678a2`
+
+**Result:**
+
+```
+Page Title: Support Desk
+URL: http://localhost:5173/#/tickets
+Snapshot: 
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - link "Support Desk tickets" [ref=e5] [cursor=pointer]:
+      - /url: "#/tickets"
+      - img [ref=e7]
+      - generic [ref=e14]: SupportDesk
+    - navigation "Main navigation" [ref=e15]:
+      - link "Tickets" [ref=e16] [cursor=pointer]:
+        - /url: "#/tickets"
+        - img [ref=e17]
+        - text: Tickets
+    - button "Help" [ref=e21] [cursor=pointer]:
+      - img [ref=e22]
+  - main [ref=e25]:
+    - region "Tickets" [ref=e98]:
+      - generic [ref=e99]:
+        - generic [ref=e100]:
+          - paragraph [ref=e101]: QUEUE / ALL TICKETS
+          - heading "Tickets" [level=1] [ref=e102]
+          - paragraph [ref=e103]: Track requests and move work forward.
+        - button "New ticket" [ref=e104] [cursor=pointer]:
+          - img [ref=e105]
+          - text: New ticket
+      - generic [ref=e106]:
+        - generic [ref=e107]:
+          - img [ref=e108]
+          - generic [ref=e111]: Search tickets
+          - textbox "Search tickets" [ref=e112]:
+            - /placeholder: Search title or description
+        - generic [ref=e113]:
+          - generic [ref=e114]: Filter by status
+          - combobox "Filter by status" [ref=e115]:
+            - option "All statuses" [selected]
+            - option "OPEN"
+            - option "IN PROGRESS"
+            - option "RESOLVED"
+            - option "CLOSED"
+            - option "CANCELLED"
+        - button "Apply filters" [ref=e116] [cursor=pointer]
+        - generic [ref=e117]: 0 tickets
+      - alert [ref=e125]:
+        - generic [ref=e126]: Tickets could not be loaded. Please try again.
+        - button "Retry" [ref=e127] [cursor=pointer]:
+          - img [ref=e128]
+          - text: Retry
+      - generic [ref=e121]: Live from the support queue
+  - contentinfo [ref=e60]:
+    - generic [ref=e61]: Support operations
+    - generic [ref=e63]: Ticket management
+    - button "New ticket" [ref=e123] [cur
+… (output truncated)
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_playwright_code"><details>
+<summary>Tool use: **run_playwright_code**</summary>
+
+Ran Playwright code
+
+**Input:**
+
+- code: `await page.getByRole('button', { name: 'New ticket' }).first().click(); await page.waitForTimeout(150); return await page.evaluate(() => ({ url: location.href, title: document.querySelector('h1')?.textContent, inputs: [...document.querySelectorAll('input, textarea, select')].map((element) => ({ name: element.name, value: element.value })), width: document.documentElement.scrollWidth, viewport: window.innerWidth }));`
+- pageId: `316a5744-d871-49fb-8c77-c4aabfa678a2`
+
+**Result:**
+
+```
+Result: {"url":"http://localhost:5173/#/tickets/new","title":"Create ticket","inputs":[{"name":"title","value":""},{"name":"description","value":""},{"name":"priority","value":""},{"name":"assignee","value":""}],"width":390,"viewport":390}
+Page Title: Support Desk
+URL: http://localhost:5173/#/tickets/new
+Snapshot: 
+- <changed> main [ref=e25]:
+  - generic [ref=e131]:
+    - generic [ref=e133]:
+      - paragraph [ref=e134]: TICKETS / NEW
+      - heading "Create ticket" [level=1] [ref=e135]
+      - paragraph [ref=e136]: Capture the issue and route it to the right team.
+    - generic [ref=e138]:
+      - generic [ref=e139]:
+        - generic [ref=e140]:
+          - generic [ref=e141]: Title Required
+          - textbox "Title Required" [active] [ref=e142]
+        - generic [ref=e143]:
+          - generic [ref=e144]: Description Required
+          - textbox "Description Required 0/2000" [ref=e145]
+          - generic [ref=e146]: 0/2000
+        - generic [ref=e147]:
+          - generic [ref=e148]: Priority Required
+          - combobox "Priority Required" [ref=e149]:
+            - option "Select priority" [disabled] [selected]
+            - option "LOW"
+            - option "MEDIUM"
+            - option "HIGH"
+            - option "CRITICAL"
+        - generic [ref=e150]:
+          - generic [ref=e151]: Assignee Optional
+          - textbox "Assignee Optional" [ref=e152]:
+            - /placeholder: Team or person
+      - generic [ref=e153]:
+        - button "Cancel" [ref=e154] [cursor=pointer]:
+          - img [ref=e155]
+          - text: Cancel
+        - button "Create ticket" [ref=e157] [cursor=pointer]:
+          - img [ref=e158]
+          - text: Create ticket
+- <changed> contentinfo [ref=e60]:
+  - ref=e61 [unchanged]
+  - ref=e63 [unchanged]
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The create flow is now verified in the browser on a 390px viewport: it opens with empty fields and no horizontal overflow. The observed API errors are only because the backend isn’t running on the proxy target; I’m taking a visual check of the compact form, then I’ll decide whether the final report should call out that prerequisite.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="screenshot_page"><details>
+<summary>Tool use: **screenshot_page**</summary>
+
+Captured screenshot of Create ticket form
+
+**Input:**
+
+- element: `Create ticket form`
+- pageId: `316a5744-d871-49fb-8c77-c4aabfa678a2`
+- scrollIntoViewIfNeeded: `true`
+- selector: `.form-sheet`
+</details></tool-use>
+
+---
+
+_**User (2026-09-27 13:23:09Z)**_
+
+@agent Try Again
+
+---
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="list_dir"><details>
+<summary>Tool use: **list_dir**</summary>
+
+Read `data`
+
+**Input:**
+
+- path: `/home/sandeep/Desktop/c2_project/c2JiraTicket/data`
+
+**Result:**
+
+```
+support-ticket-management.mv.db
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The browser renders the mobile create form cleanly, and the list’s backend-unavailable state is actionable. I found two contract-alignment details while reviewing interactions: clearing an assignee on PUT should submit `null`, and a PATCH response omits comments, so the detail page should preserve its already-loaded comments when updating status. I’m fixing both without changing backend code.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **App.jsx**</summary>
+
+@@ lines 1-155 @@
+
+```
+import { useEffect, useState } from 'react';
+import { CircleHelp, LifeBuoy, Plus, TicketCheck } from 'lucide-react';
+import { createTicket, getTicket, updateTicket, userMessageFor } from './api.js';
+import TicketDetailPage from './TicketDetailPage.jsx';
+import TicketForm from './TicketForm.jsx';
+import TicketListPage from './TicketListPage.jsx';
+
+function readRoute() {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const parts = hash.split('/').filter(Boolean);
+  if (parts[0] !== 'tickets' || parts.length === 1) return { page: 'list' };
+  if (parts[1] === 'new') return { page: 'create' };
+  if (parts[2] === 'edit') return { page: 'edit', ticketId: decodeURIComponent(parts[1]) };
+  return { page: 'detail', ticketId: decodeURIComponent(parts[1]) };
+}
+
+function navigate(path) {
+  window.location.hash = path;
+}
+
+function TicketEditorPage({ mode, ticketId, onCancel, onSaved }) {
+  const [ticket, setTicket] = useState(null);
+  const [loading, setLoading] = useState(mode === 'edit');
+  const [loadError, setLoadError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    if (mode !== 'edit') return undefined;
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
+    getTicket(ticketId)
+      .then((result) => { if (active) setTicket(result); })
+      .catch((error) => { if (active) setLoadError(error); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [mode, ticketId, retryKey]);
+
+  async function handleSubmit(fields) {
+    setSaving(true);
+    setErrorMessage('');
+    setFieldErrors({});
+    try {
+      const requestFields = mode === 'edit' && fields.assignee === ''
+        ? { ...fields, assignee: null }
+        : fields;
+      const saved = mode === 'edit'
+        ? await updateTicket(ticketId, requestFields)
+        : await createTicket(requestFields);
+      onSaved(saved.id);
+    } catch (error) {
+      setFieldErrors(error.errors || {});
+      setErrorMessage(userMessageFor(error, mode === 'edit'
+        ? 'Ticket changes could not be saved.'
+        : 'Ticket could not be created.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="page-loading" role="status">Loading ticket details…</div>;
+  if (loadError) {
+    return (
+      <section className="page-section state-page">
+        <div className="state-card">
+          <span className="eyebrow">{loadError.status === 404 ? 'TICKET UNAVAILABLE' : 'LOAD ERROR'}</span>
+          <h1>{loadError.status === 404 ? 'Ticket not found' : 'Ticket could not be loaded'}</h1>
+          <p>{userMessageFor(loadError, 'Try loading the ticket again.')}</p>
+          <div className="state-actions">
+            <button className="button button-secondary" onClick={() => setRetryKey((key) => key + 1)}>Retry</button>
+            <button className="button button-quiet" onClick={onCancel}>Back</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="page-section editor-page">
+      <div className="page-heading-row">
+        <div>
+          <p className="eyebrow">{mode === 'edit' ? 'TICKET / EDIT' : 'TICKETS / NEW'}</p>
+          <h1>{mode === 'edit' ? 'Edit ticket' : 'Create ticket'}</h1>
+          <p className="page-subtitle">{mode === 'edit' ? 'Update the request details.' : 'Capture the issue and route it to the right team.'}</p>
+        </div>
+      </div>
+      <div className="form-sheet">
+        <TicketForm
+          mode={mode}
+          initialValue={ticket || undefined}
+          busy={saving}
+          errorMessage={errorMessage}
+          fieldErrors={fieldErrors}
+          onSubmit={handleSubmit}
+          onCancel={onCancel}
+        />
+      </div>
+    </section>
+  );
+}
+
+export default function App() {
+  const [route, setRoute] = useState(readRoute);
+
+  useEffect(() => {
+    const updateRoute = () => setRoute(readRoute());
+    window.addEventListener('hashchange', updateRoute);
+    return () => window.removeEventListener('hashchange', updateRoute);
+  }, []);
+
+  function openTickets() { navigate('/tickets'); }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="#/tickets" aria-label="Support Desk tickets">
+          <span className="brand-mark"><LifeBuoy size={21} aria-hidden="true" /></span>
+          <span className="brand-name">Support<span>Desk</span></span>
+        </a>
+        <nav className="top-nav" aria-label="Main navigation">
+          <a className={route.page === 'list' ? 'nav-link active' : 'nav-link'} href="#/tickets"><TicketCheck size={16} /> Tickets</a>
+        </nav>
+        <div className="topbar-right">
+          <span className="workspace-label"><span className="workspace-dot" /> Support workspace</span>
+          <button className="icon-button" aria-label="Help" title="Help"><CircleHelp size={18} /></button>
+        </div>
+      </header>
+
+      <main className="main-shell">
+        {route.page === 'list' && <TicketListPage onCreate={() => navigate('/tickets/new')} />}
+        {route.page === 'create' && (
+          <TicketEditorPage mode="create" onCancel={openTickets} onSaved={(id) => navigate(`/tickets/${id}`)} />
+        )}
+        {route.page === 'edit' && (
+          <TicketEditorPage mode="edit" ticketId={route.ticketId} onCancel={() => navigate(`/tickets/${route.ticketId}`)} onSaved={(id) => navigate(`/tickets/${id}`)} />
+        )}
+        {route.page === 'detail' && (
+          <TicketDetailPage ticketId={route.ticketId} onBack={openTickets} onEdit={() => navigate(`/tickets/${route.ticketId}/edit`)} />
+        )}
+      </main>
+
+      <footer className="app-footer">
+        <span>Support operations</span>
+        <span className="footer-separator" />
+        <span>Ticket management</span>
+        {route.page === 'list' && <button onClick={() => navigate('/tickets/new')}><Plus size={14} /> New ticket</button>}
+      </footer>
+    </div>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+
+```
+
+```
+
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="textEditGroup"><details>
+<summary>Edit: **TicketDetailPage.jsx**</summary>
+
+@@ lines 1-216 @@
+
+```
+import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, Clock3, MessageCircle, Pencil, RotateCw, Send, Workflow } from 'lucide-react';
+import { addComment, changeTicketStatus, getTicket, userMessageFor } from './api.js';
+
+const NEXT_STATUSES = {
+  OPEN: ['IN_PROGRESS', 'CANCELLED'],
+  IN_PROGRESS: ['RESOLVED', 'CANCELLED'],
+  RESOLVED: ['CLOSED'],
+  CLOSED: [],
+  CANCELLED: [],
+};
+
+function formatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium', timeStyle: 'short',
+  }).format(date);
+}
+
+export default function TicketDetailPage({ ticketId, onBack, onEdit }) {
+  const [ticket, setTicket] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [transitionBusy, setTransitionBusy] = useState(false);
+  const [comment, setComment] = useState({ author: '', content: '' });
+  const [commentErrors, setCommentErrors] = useState({});
+  const [commentBusy, setCommentBusy] = useState(false);
+
+  const loadTicket = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setTicket(await getTicket(ticketId));
+    } catch (error) {
+      setLoadError(error);
+      setTicket(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [ticketId]);
+
+  useEffect(() => { loadTicket(); }, [loadTicket]);
+
+  async function handleTransition(status) {
+    setTransitionBusy(true);
+    setActionError('');
+    try {
+      const updated = await changeTicketStatus(ticketId, status);
+      setTicket((current) => ({ ...updated, comments: current?.comments || [] }));
+    } catch (error) {
+      setActionError(userMessageFor(error, 'The status could not be changed.'));
+      if (error.code === 'INVALID_STATUS_TRANSITION') await loadTicket();
+    } finally {
+      setTransitionBusy(false);
+    }
+  }
+
+  async function handleCommentSubmit(event) {
+    event.preventDefault();
+    setCommentBusy(true);
+    setCommentErrors({});
+    setActionError('');
+    try {
+      await addComment(ticketId, comment);
+      setComment({ author: '', content: '' });
+      await loadTicket();
+    } catch (error) {
+      setCommentErrors(error.errors || {});
+      setActionError(userMessageFor(error, 'The comment could not be added.'));
+      if (error.code === 'NOT_FOUND') await loadTicket();
+    } finally {
+      setCommentBusy(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="page-loading" role="status"><span className="loading-dot" /> Loading ticket…</div>;
+  }
+
+  if (!ticket) {
+    return (
+      <section className="page-section state-page">
+        <button className="button button-quiet" onClick={onBack}><ArrowLeft size={16} /> All tickets</button>
+        <div className="state-card">
+          <span className="eyebrow">TICKET UNAVAILABLE</span>
+          <h1>{loadError?.status === 404 ? 'Ticket not found' : 'Ticket could not be loaded'}</h1>
+          <p>{userMessageFor(loadError, 'Try loading the ticket again.')}</p>
+          <div className="state-actions">
+            <button className="button button-secondary" onClick={loadTicket}><RotateCw size={15} /> Retry</button>
+            <button className="button button-quiet" onClick={onBack}>Back to tickets</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  const transitions = NEXT_STATUSES[ticket.status] || [];
+
+  return (
+    <section className="page-section detail-page" aria-labelledby="detail-title">
+      <div className="detail-topline">
+        <button className="button button-quiet back-link" onClick={onBack}><ArrowLeft size={16} /> All tickets</button>
+        <span className="detail-id">TICKET <code>{ticket.id}</code></span>
+      </div>
+
+      {actionError && <div className="notice notice-error" role="alert">{actionError}</div>}
+
+      <header className="detail-heading">
+        <div className="detail-heading-copy">
+          <div className="detail-tags">
+            <span className={`priority-tag priority-${ticket.priority.toLowerCase()}`}>{ticket.priority}</span>
+            <span className={`status-tag status-${ticket.status.toLowerCase()}`}>{ticket.status.replace('_', ' ')}</span>
+          </div>
+          <h1 id="detail-title">{ticket.title}</h1>
+        </div>
+        <button className="button button-secondary" onClick={() => onEdit(ticket)}>
+          <Pencil size={16} aria-hidden="true" /> Edit ticket
+        </button>
+      </header>
+
+      <div className="detail-grid">
+        <article className="detail-main">
+          <section className="content-section">
+            <h2>Description</h2>
+            <p className="description-text">{ticket.description}</p>
+          </section>
+
+          <section className="content-section comments-section">
+            <div className="section-heading-row">
+              <div>
+                <p className="eyebrow">CONVERSATION</p>
+                <h2><MessageCircle size={18} aria-hidden="true" /> Comments <span className="section-count">{ticket.comments?.length || 0}</span></h2>
+              </div>
+            </div>
+
+            <div className="comment-list">
+              {ticket.comments?.length ? ticket.comments.map((item) => (
+                <article className="comment-item" key={item.id}>
+                  <div className="comment-marker" aria-hidden="true">{item.author.trim().charAt(0).toUpperCase() || '?'}</div>
+                  <div className="comment-body">
+                    <div className="comment-meta"><strong>{item.author}</strong><time dateTime={item.createdAt}>{formatDateTime(item.createdAt)}</time></div>
+                    <p>{item.content}</p>
+                  </div>
+                </article>
+              )) : (
+                <div className="comments-empty">No comments yet. Add the first update below.</div>
+              )}
+            </div>
+
+            <form className="comment-form" onSubmit={handleCommentSubmit}>
+              <label className="field">
+                <span>Author <span className="required-mark">Required</span></span>
+                <input
+                  value={comment.author}
+                  onChange={(event) => setComment((current) => ({ ...current, author: event.target.value }))}
+                  required
+                  aria-invalid={Boolean(commentErrors.author)}
+                />
+                {commentErrors.author && <span className="field-error">{commentErrors.author}</span>}
+              </label>
+              <label className="field">
+                <span>Comment <span className="required-mark">Required</span></span>
+                <textarea
+                  value={comment.content}
+                  onChange={(event) => setComment((current) => ({ ...current, content: event.target.value }))}
+                  maxLength={1000}
+                  rows={3}
+                  required
+                  aria-invalid={Boolean(commentErrors.content)}
+                />
+                {commentErrors.content && <span className="field-error">{commentErrors.content}</span>}
+                <span className="field-hint">{comment.content.length}/1000</span>
+              </label>
+              <div className="form-actions form-actions-end">
+                <button className="button button-primary" type="submit" disabled={commentBusy}>
+                  <Send size={15} aria-hidden="true" /> {commentBusy ? 'Sending…' : 'Add comment'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </article>
+
+        <aside className="detail-aside">
+          <section className="aside-section">
+            <h2>Ticket information</h2>
+            <dl className="ticket-facts">
+              <div><dt>Assignee</dt><dd>{ticket.assignee || 'Unassigned'}</dd></div>
+              <div><dt>Created</dt><dd><Clock3 size={14} /> {formatDateTime(ticket.createdAt)}</dd></div>
+              <div><dt>Updated</dt><dd><Clock3 size={14} /> {formatDateTime(ticket.updatedAt)}</dd></div>
+            </dl>
+          </section>
+
+          <section className="aside-section transition-section">
+            <div className="aside-heading-icon"><Workflow size={17} aria-hidden="true" /><h2>Change status</h2></div>
+            {transitions.length ? (
+              <div className="transition-actions">
+                {transitions.map((status) => (
+                  <button key={status} className="transition-button" disabled={transitionBusy} onClick={() => handleTransition(status)}>
+                    {transitionBusy ? 'Updating…' : status.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="terminal-note">This ticket is in a terminal status.</p>
+            )}
+            <p className="service-note">Status changes are checked by the support service.</p>
+          </section>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` npm run build`
+
+Rebuild after fixing update-assignee semantics and preserving comments on status updates.
+
+```bash
+cd /home/sandeep/Desktop/c2_project/c2JiraTicket/frontend && npm run build
+```
+
+**Result:**
+
+```
+Note: The tool simplified the command to ` npm run build` (terminal ID=3a401e7a-5ac8-4cbd-bc94-4570ee5fb286). This is the output of running that command instead:
+
+> support-ticket-frontend@1.0.0 build
+> vite build
+
+vite v6.4.3 building for production...
+✓ 1583 modules transformed.
+dist/index.html                   0.67 kB │ gzip:  0.36 kB
+dist/assets/index-CJbDheKt.css   16.36 kB │ gzip:  4.43 kB
+dist/assets/index-CNUKPbv0.js   249.62 kB │ gzip: 76.36 kB
+✓ built in 3.05s
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The final production build passes after both interaction fixes. I’m checking the exact frontend file set and confirming the Vite server is still available; I won’t touch the existing backend database/configuration.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` git status --short --untracked-files=all`
+
+Collect the final changed-file list while ensuring generated node_modules/dist are ignored and backend/spec files remain untouched.
+
+```bash
+git status --short --untracked-files=all
+```
+
+**Result:**
+
+```
+ M ../.specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M ../src/main/java/com/supportticket/exception/InvalidStatusTransitionException
+.java
+?? ../.specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.m
+d
+?? .env.example
+?? .gitignore
+?? index.html
+?? package-lock.json
+?? package.json
+?? src/App.jsx
+?? src/TicketDetailPage.jsx
+?? src/TicketForm.jsx
+?? src/TicketListPage.jsx
+?? src/api.js
+?? src/main.jsx
+?? src/styles.css
+?? vite.config.js
+?? ../package-lock.json
+?? ../src/main/java/com/supportticket/controller/TicketController.java
+?? ../src/main/java/com/supportticket/service/CommentService.java
+?? ../src/main/java/com/supportticket/service/TicketService.java
+?? ../src/test/java/com/supportticket/controller/CommentControllerIntegrationTes
+t.java
+?? ../src/test/java/com/supportticket/controller/TicketControllerIntegrationTest
+.java
+?? ../src/test/java/com/supportticket/service/TicketServiceTest.java
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` curl -sS -o /dev/null -w 'frontend HTTP %\{http\_code\}\\n' http://localhost:5173/`
+
+Confirm the Vite dev server remains reachable at the URL provided to the user.
+
+```bash
+curl -sS -o /dev/null -w 'frontend HTTP %{http_code}\n' http://localhost:5173/
+```
+
+**Result:**
+
+```
+frontend HTTP 200
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="get_errors"><details>
+<summary>Tool use: **get_errors**</summary>
+
+Checked `App.jsx`, `TicketListPage.jsx`, `TicketDetailPage.jsx`, `TicketForm.jsx`, `api.js`, no problems found
+
+**Input:**
+
+- filePaths:
+
+```
+[
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/App.jsx",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketListPage.jsx",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketDetailPage.jsx",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketForm.jsx",
+  "/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/api.js"
+]
+```
+
+
+**Result:**
+
+```
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/App.jsx">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketListPage.jsx">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketDetailPage.jsx">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/TicketForm.jsx">
+No errors found
+</errors>
+<errors path="/home/sandeep/Desktop/c2_project/c2JiraTicket/frontend/src/api.js">
+No errors found
+</errors>
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+The final status shows Vite output is correctly ignored and the dev server returns HTTP 200. The earlier install attempt from the repository root also produced an unintended root `package-lock.json`; I’m removing that generated artifact so only the frontend subproject has npm metadata.
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="write" data-tool-name="apply_patch"><details>
+<summary>Tool use: **apply_patch**</summary>
+
+Generating patch (3 lines) in `package-lock.json`
+
+**Input:**
+
+- explanation: `Remove the stray root lockfile created by the initial npm install attempt; the actual frontend lockfile remains under frontend/.`
+- input:
+
+```
+*** Begin Patch
+*** Delete File: /home/sandeep/Desktop/c2_project/c2JiraTicket/package-lock.json
+*** End Patch
+```
+
+
+**Result:**
+
+```
+The following files were successfully edited:
+/home/sandeep/Desktop/c2_project/c2JiraTicket/package-lock.json
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+<tool-use data-tool-type="generic" data-tool-name="run_in_terminal"><details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+Running ` cd /home/sandeep/Desktop/c2\_project/c2JiraTicket && git status --short --unt...`
+
+Verify the stray root lockfile is gone and capture the final frontend files plus pre-existing modifications.
+
+```bash
+cd /home/sandeep/Desktop/c2_project/c2JiraTicket && git status --short --untracked-files=all
+```
+
+**Result:**
+
+```
+ M .specstory/history/2026-09-27_11-48-17Z-implement-ticket-and-comment.md
+ M src/main/java/com/supportticket/exception/InvalidStatusTransitionException.ja
+va
+?? .specstory/history/2026-09-27_12-10-13Z-implement-ticket-api-controllers.md
+?? frontend/.env.example
+?? frontend/.gitignore
+?? frontend/index.html
+?? frontend/package-lock.json
+?? frontend/package.json
+?? frontend/src/App.jsx
+?? frontend/src/TicketDetailPage.jsx
+?? frontend/src/TicketForm.jsx
+?? frontend/src/TicketListPage.jsx
+?? frontend/src/api.js
+?? frontend/src/main.jsx
+?? frontend/src/styles.css
+?? frontend/vite.config.js
+?? src/main/java/com/supportticket/controller/TicketController.java
+?? src/main/java/com/supportticket/service/CommentService.java
+?? src/main/java/com/supportticket/service/TicketService.java
+?? src/test/java/com/supportticket/controller/CommentControllerIntegrationTest.j
+ava
+?? src/test/java/com/supportticket/controller/TicketControllerIntegrationTest.ja
+va
+?? src/test/java/com/supportticket/service/TicketServiceTest.java
+```
+</details></tool-use>
+
+_**Agent (copilot/auto)**_
+
+Implemented the frontend in `frontend`. The Vite dev server is running at [http://localhost:5173](http://localhost:5173).
+
+**Routes**
+- `#/tickets` — searchable and filterable ticket list
+- `#/tickets/new` — create ticket
+- `#/tickets/:id` — ticket details, status changes, and comments
+- `#/tickets/:id/edit` — edit title, description, priority, and assignee only
+
+**Files created**
+- `frontend/package.json`, `frontend/package-lock.json`, `frontend/vite.config.js`, `frontend/index.html`, `frontend/.env.example`, `frontend/.gitignore`
+- `frontend/src/App.jsx`, `frontend/src/TicketListPage.jsx`, `frontend/src/TicketDetailPage.jsx`, `frontend/src/TicketForm.jsx`, `frontend/src/api.js`, `frontend/src/main.jsx`, `frontend/src/styles.css`
+
+API calls are centralized in  and cover list/search/filter, get details, create/update tickets, change status, and add comments. Backend field errors are shown on forms; not-found, invalid-transition, network, and unexpected errors get user-facing messages. A 409 status conflict triggers a ticket reload. Empty assignees are sent as `null` on updates.
+
+**Verification:** `npm run build` passed. The frontend returned HTTP 200 in the browser; the 390px viewport check found no horizontal overflow. The backend was not running on port 8080 during verification, so live ticket data requires the backend to be started. Its proxy target and the API base URL are configurable with `VITE_BACKEND_URL` and `VITE_API_BASE_URL`. No backend or specification files were changed for this step.
